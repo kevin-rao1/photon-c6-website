@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<title>The Atom Itself · live TDSE · C6</title>
+<meta name="description" content="A hydrogen atom solving the Schrödinger equation live in your browser: orbitals, line spectra, and the photoelectric effect — computed, not animated."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--void:#08080d;--carbon:#120f17;--line:#26222f;--ink:#ece9f2;--dim:#9b94a8;--faint:#6c6578;
+ --cerise:#e64097;--cerise2:#ff6fb5;--teal:#22b5b9;--amber:#f0a830;--ice:#9fe6ff;}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{background:var(--void);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+#stage{position:fixed;inset:0}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#000}
+#vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 120% at 50% 44%,transparent 54%,rgba(0,0,0,.5) 100%)}
+#hud{position:absolute;inset:0;pointer-events:none}
+.chapnum{display:none}#dock{position:absolute;left:30px;bottom:24px;width:438px;max-width:calc(100vw - 56px);display:flex;flex-direction:column;gap:15px;pointer-events:none;z-index:6}#dock>*{pointer-events:auto}#meta{display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint)}#meta b{color:var(--ice);font-weight:600}#meta #ctrl-hint{margin-left:auto;letter-spacing:.08em;text-transform:none;opacity:.55}#instr{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;min-height:42px}#gauges{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}.ro-rows{display:flex;gap:13px;margin-top:8px;font-size:10.5px}.ro-rows span{color:var(--dim)}.ro-rows i{font-style:normal;color:var(--faint)}.ro-rows b{color:var(--dim);font-weight:500;margin-left:5px}
+.chapnum b{color:var(--cerise);font-weight:500}
+
+#clock{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--amber);opacity:0;transition:opacity .3s}
+#clock .l{color:var(--faint);letter-spacing:.1em}
+#scope{width:196px;height:42px;border:1px solid var(--line);border-radius:6px;background:rgba(6,6,10,.45);opacity:0;transition:opacity .3s}
+#scope .lab{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;fill:var(--faint);text-transform:uppercase}
+#readout{font-family:'JetBrains Mono',monospace}
+.ro-cap{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+.ro-big{font-size:29px;color:var(--ice);line-height:1;font-weight:500}
+
+.ro-row .v{color:var(--ink);min-width:46px;text-align:right}
+#panel{pointer-events:auto}
+#eyebrow{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
+#title{font-family:'DM Serif Display',Georgia,serif;font-size:clamp(23px,2.4vw,33px);line-height:1.07;letter-spacing:-.01em;margin-bottom:11px}
+#title em{font-style:italic;color:var(--cerise2)}
+#body{font-size:14.5px;line-height:1.62;color:#cfcad9}
+#body .k{color:var(--ice)}#body .c{color:var(--cerise2)}#body .t{color:var(--teal)}#body b{color:var(--ink);font-weight:600}
+#callout{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s}
+#callout svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#callout .lab{position:absolute;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink);background:rgba(8,8,13,.82);border:1px solid var(--line);border-left:2px solid var(--cerise);padding:5px 9px;border-radius:5px;white-space:nowrap;backdrop-filter:blur(3px);transform:translateY(-50%)}
+#callout .lab.teal{border-left-color:var(--teal)}#callout .lab.ice{border-left-color:var(--ice)}
+#nav{display:flex;align-items:center;gap:12px;margin-top:3px}
+.btn{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ink);background:rgba(18,15,23,.72);border:1px solid var(--line);padding:9px 16px;border-radius:8px;cursor:pointer;transition:.16s;backdrop-filter:blur(4px)}
+.btn:hover{border-color:var(--cerise);color:#fff}.btn:disabled{opacity:.3;cursor:default;border-color:var(--line);color:var(--dim)}
+.btn.primary{background:var(--cerise);color:#0a0a0f;border-color:var(--cerise);font-weight:700}.btn.primary:hover{background:var(--cerise2);border-color:var(--cerise2)}
+#dots{display:flex;gap:6px}.dot{width:6px;height:6px;border-radius:50%;background:var(--line);transition:.2s;cursor:pointer}.dot.active{background:var(--cerise);transform:scale(1.4)}.dot.done{background:var(--faint)}
+#prog{position:absolute;left:0;top:0;height:2px;width:0;background:linear-gradient(90deg,var(--cerise),var(--teal));transition:width .12s;z-index:5}
+#paused{position:absolute;left:50%;top:26px;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--amber);opacity:0;transition:.3s}#paused.show{opacity:.85}
+#throttle{position:absolute;left:50%;top:46px;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--cerise);opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}#throttle.show{opacity:.9}
+#sandbox{display:none;flex-direction:column;gap:11px}#sandbox.show{display:flex}
+#sandbox .sl-lab{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim)}#sandbox .sl-lab .v{color:var(--cerise)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:var(--line);border-radius:99px;outline:none;margin-top:6px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--cerise);cursor:pointer;box-shadow:0 0 8px rgba(230,64,151,.6)}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:var(--cerise);cursor:pointer}
+/* documentation page: viewport hidden, centred prose */
+.docmode #gl,.docmode #axes,.docmode #callout,.docmode #vig,.docmode #dock{opacity:0!important;pointer-events:none}
+#doc{position:absolute;inset:0;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;pointer-events:auto}
+.docmode #doc{display:block}
+#doc .wrap{max-width:680px;margin:0 auto;padding:84px 28px 150px}
+#doc h2{font-family:'DM Serif Display',serif;font-weight:400;font-size:30px;line-height:1.15;color:var(--ink);margin:0 0 6px}
+#doc .sub{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--cerise);margin-bottom:26px}
+#doc h3{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin:30px 0 8px}
+#doc p{font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.72;color:#c8c4d2;margin:0 0 13px}
+#doc .led{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 4px;font-size:14px;line-height:1.6}
+#doc .led .t{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;padding-top:3px;white-space:nowrap}
+#doc .led .real{color:var(--teal)}#doc .led .fake{color:var(--cerise)}
+#doc .led span:nth-child(even){color:#bdb9c8;font-family:'DM Sans',sans-serif}
+#doc em{color:var(--ice);font-style:italic}#doc b{color:var(--ink);font-weight:600}
+#doc figure{margin:26px 0 22px}#doc figure img{width:100%;display:block;border:1px solid var(--line);border-radius:8px;background:#0c0c12}
+#doc figcaption{font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.7;letter-spacing:.02em;color:var(--faint);margin-top:11px;padding-left:13px;border-left:2px solid var(--line)}
+#intro{position:absolute;inset:0;background:var(--void);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:24px}
+#intro .mono{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--faint);text-transform:uppercase}
+#intro h1{font-family:'DM Serif Display',serif;font-size:clamp(30px,6vw,60px);line-height:1.03;max-width:17ch}#intro h1 em{font-style:italic;color:var(--cerise2)}
+#intro p{color:var(--dim);max-width:54ch;line-height:1.6;font-size:15px}
+#fade{position:absolute;inset:0;background:var(--void);z-index:15;pointer-events:none;opacity:0;transition:opacity .24s}#fade.show{opacity:1}
+#err{position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:30px;z-index:30;background:var(--void)}#err.show{display:grid}
+#err .box{font-family:'JetBrains Mono',monospace;max-width:52ch}#err .box .c{color:var(--cerise)}
+@media (max-width:760px){#dock{left:13px;right:13px;width:auto;bottom:13px;gap:11px}#gauges{display:none}#title{font-size:22px}#meta #ctrl-hint{display:none}#doc .wrap{padding:64px 20px 140px}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <div id="vig"></div>
+  <div id="hud">
+    <svg id="axes" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible"></svg>
+    <div id="callout"><svg></svg><div class="lab"></div></div>
+    <div id="dock">
+      <div id="meta"><b id="cn-cur">01</b> / <span id="cn-tot">15</span> &nbsp;·&nbsp; hydrogen<span id="ctrl-hint">drag&nbsp;·&nbsp;orbit&nbsp;&nbsp; scroll&nbsp;·&nbsp;zoom</span></div>
+      <div id="panel"><div id="eyebrow"></div><div id="title"></div><div id="body"></div></div>
+      <div id="instr">
+        <div id="readout">
+          <div class="ro-cap" id="ro-cap">binding energy</div>
+          <div class="ro-big" id="ro-big">—</div>
+          <div class="ro-rows"><span><i>ejected</i><b id="ro-ion">0%</b></span><span><i>2p</i><b id="ro-p2">0%</b></span><span><i>3d</i><b id="ro-p3">0%</b></span></div>
+        </div>
+        <div id="gauges">
+          <svg id="scope" viewBox="0 0 230 58" preserveAspectRatio="none">
+            <text class="lab" x="5" y="12">drive field</text>
+            <line x1="0" y1="35" x2="230" y2="35" stroke="#26222f" stroke-width="1"/>
+            <polyline id="scope-trace" points="" fill="none" stroke="#f0a830" stroke-width="1.4"/>
+          </svg>
+          <div id="clock"><span class="l">t =</span> <span id="clock-v">0 as</span></div>
+        </div>
+      </div>
+      <div id="sandbox">
+        <div><div class="sl-lab"><span>intensity</span><span class="v" id="sb-i-v">2.0e14</span></div><input id="sb-i" type="range" min="0" max="100" value="72"/></div>
+        <div><div class="sl-lab"><span>wavelength</span><span class="v" id="sb-w-v">800 nm</span></div><input id="sb-w" type="range" min="250" max="800" value="800" step="10"/></div>
+        <div><div class="sl-lab"><span>Keldysh γ</span><span class="v" id="sb-g-v">0.75</span></div></div>
+        <button class="btn primary" id="sb-run" style="width:100%">▶ fire pulse</button>
+      </div>
+      <div id="nav"><button class="btn" id="prev">← back</button><div id="dots"></div><button class="btn primary" id="next">next →</button></div>
+    </div>
+    <div id="doc"><div class="wrap">
+      <div class="sub">a technical note</div>
+      <h2>How this was made</h2>
+      <p>I built this to solve one atom and then show its insides without lying about any of them. It's a live solution of the time-dependent Schrödinger equation for a single electron bound to a proton — hydrogen, the one atom that can be solved exactly. The obstacle is size: the full wavefunction lives on a three-dimensional grid of hundreds of millions of points, far too many to step frame by frame in a browser. Symmetry is the way out. Because the driving light points along one axis, the wavefunction splits <em>exactly</em> into a small set of angular pieces — spherical-harmonic channels — each collapsed to a function of radius alone. I march those channels forward together with a split-operator Crank–Nicolson scheme in atomic units, on a background thread, and the GPU rebuilds <b>|&#968;|&#178;</b> and ray-marches it into the cloud you see.</p>
+
+      <h3>why the channel trick works</h3>
+      <p>For a field along a single axis the split is exact, not an approximation — it just re-expresses the same wavefunction in a far cheaper basis. The only cost is how many channels you keep, which trades accuracy for speed. The gentle climb up the energy ladder needs seven; single-photon ionisation, where the freed electron leaves as a near-pure p-wave, needs five; the violent infrared case needs about thirty-three, because the field drives the electron back through the core and it reaches high angular momentum on the way. The one thing this basis cannot represent is light arriving from more than one direction at once — so the field always points one way.</p>
+
+      <h3>drawing the cloud</h3>
+      <p>Each pixel sends a ray through the volume, rebuilds the density from the channels along it, and keeps the single brightest point it crosses. The density spans many orders of magnitude between the dense core and the faint outgoing wave, so I map brightness logarithmically and rescale every frame to the densest point present — which is why a thinning cloud appears to brighten as the core drains away. The clock is tied to wall-time, not to how fast the machine can compute: every step takes the same number of seconds everywhere, and hardware that can't keep up is slowed and told so, rather than left to stutter.</p>
+
+      <h3>what's real, and what's simplified</h3>
+      <p>The electron and its equation are real. Every shape, node, fringe and threshold you see is emergent — none of it is drawn or scripted. Three things are simplified on purpose, and the line I held is this: simplify the <em>inputs</em>, never the <em>outputs</em>. The proton is held fixed, which is honest — it outweighs the electron about two thousand to one and barely moves. The light is a classical oscillating field rather than counted photons; the energy crossing in and out is exact, but a single photon is never resolved as a quantum. And the lone photon that flies off when the atom falls is the one openly scripted thing on screen. A real one would leave at the speed of light — about 137 in these atomic units, two orders of magnitude faster than the electron's own motion — and you would never catch it. This marker crawls far below that, only so it is slow enough to watch; it marks that a quantum of light has left, not how fast it went. A soft absorbing edge at the boundary quietly removes any electron that reaches it, standing in for a detector placed far away.</p>
+
+      <h3>what was easy, and what was hard</h3>
+      <p>Every line of this came from me, written to direction in one sitting of about seven hours; none of it was typed by hand. That makes the usual measure of difficulty meaningless — no long nights chasing a bug, only rounds of conversation, and the record of what was hard is simply how many rounds each thing took. The split surprised me. The quantum mechanics, the part that sounds hard, was the easy part. Seeing it was the hard part.</p>
+      <p>The solver came together fast. A coupled-channel split-operator integrator is well-trodden ground, and it matched an independent reference almost at once: the right energy levels, the right orbital shapes, the driven transitions moving exactly the population they should. The violent regime checked out too — pushed hard, the atom radiates a comb of high harmonics, and only the odd ones survive, exactly as the inversion symmetry demands. Nothing imposed that; it fell out of the equation. Long before any real-time rendering existed, a handful of flat 2-D plots had already settled that the physics was sound.</p>
+      <figure><img src="img/tdse_validation.png" alt="strong-field wavefunction snapshots and HHG spectrum validated against a reference solver" loading="lazy"/><figcaption>The hardest case, validated first: strong-field snapshots — a sliver tunnelling out near the field peak, then a structured continuum streaming away — beside the high-harmonic spectrum. The odd-only lines are the symmetry showing itself, not something I put in; all of it was checked against a separate solver before any live graphics existed.</figcaption></figure>
+      <p>Showing it was the fight. The same dynamic range that makes the physics rich makes it almost impossible to expose: no single brightness window holds both the dense core and the faint outgoing wave — too tight and the outer structure vanishes, too wide and everything floods to a flat glow. Worse, the 3-D volume that looks so good here actively buries detail a flat slice shows at a glance. I spent round after round ruling out the channel count and the pacing optimisations before pinning the real culprit: the brightness window itself.</p>
+      <figure><img src="img/diag_preview.png" alt="2-D slice compared against volume renders at several brightness windows and step counts" loading="lazy"/><figcaption>Isolating the exposure. A flat 2-D slice against the volume render at several brightness windows and step counts — proof that the projection and the optimisations weren't eating the structure. Widening the window alone brought it back.</figcaption></figure>
+      <p>The colour map was the same fight in miniature. The original teal-and-cerise was on-brand and looked the part, but it couldn't carry the structure the physics needed to show. Moving to a perceptually-ordered map was the moment the nodes, the interference fringes and the outgoing lobes became legible instead of merely implied.</p>
+      <figure><img src="img/diag_colors.png" alt="the same wavefunction rendered in four perceptual colour maps" loading="lazy"/><figcaption>Choosing a colour map by what it reveals, not what it matches. Four perceptual maps against the same instant; the structure was always in the data — the brand palette had simply been hiding it.</figcaption></figure>
+      <p>The small things were stubbornly hard too. An orbital is so nearly symmetric that a viewer loses all sense of up, down, or which way the light is pushing — so I designed in a small orientation gizmo and one fixed, labelled axis, purely so the space reads at a glance. And every beat is tuned as teaching, not as physics: the first climb is calibrated to land almost perfectly in a single clean state, because the whole point of that moment is how sharp a pure state looks against the mess that follows.</p>
+      <p>The writing took more passes than the physics, and it's worth saying why, since written explanation is where work like this most visibly fails. The failures are specific. It teaches in the order things were discovered instead of the order they're understood — archaeology, when the reader came for science. It leaves derivation-traces: hedges and asides that answer some question from the conversation that no reader will ever ask. It blends registers, setting offhand shorthand beside finished prose. And because each edit patches one spot without re-reading the whole, the seams accrete into the disjointed, faintly uncanny voice people have learned to distrust on sight. None of that is hard to avoid once it's named; it's only hard to avoid by accident. The fix is dull — decide what the reader must understand, write to that and nothing else, and treat every pass as a rewrite of the whole rather than a repair of the last complaint. I held this page to it.</p>
+
+      <h3>the long un-faking</h3>
+      <p>None of what you walked through was the first plan. The first version barely simulated anything: the orbitals were closed-form shapes drawn directly, and the photoelectric "effect" was arithmetic dressed as animation — a glowing dot slid along a line, "hitting" the atom was a distance check, and the cloud faded to black to mean "ionised". The numbers obeyed Einstein's equation, but nothing evolved. The physics was asserted, then illustrated.</p>
+      <p>Replacing that with a real time-dependent solver changed what the piece could honestly claim, and walked straight into walls that looked fundamental. An excited atom seemingly couldn't be shown staying excited: staying put means shedding the energy gap as emitted light, and spontaneous emission is the one half of the light–matter exchange this model doesn't carry. And the fall back down, in an early cut, was a lie — the code overwrote the wavefunction with a perfect ground-state blob and played a photon leaving. That was a model-swap in the costume of physics, the exact cheat this whole thing exists to refuse.</p>
+      <p>Every wall gave way to the same move: simulate more. I tuned the driving pulse until the electron parks in the upper state on its own once the field switches off, so both the climb and the landing are real. I rebuilt the decay as the excited cloud actually draining back down — sloshing as a radiating dipole and settling into the ground state by itself. I left the unflattering cases in: the faint leak below the photoelectric threshold, where an electron now and then catches two photons at once, stayed rather than being tidied away, because the real effect is that bit messy and a too-clean simulation tells its own kind of lie.</p>
+      <p>One distinction sits under all of it. Simplifying the <em>inputs</em> is honest — a classical field instead of quantised light, a fixed proton, an absorbing wall for a far-off detector — because each is stated plainly and none of it changes how the wavefunction is computed. Faking the <em>outputs</em> is not — snapping to an ideal shape, scripting a particle's path, dissolving the cloud on cue — because that is a drawing of physics in physics' clothes. There is a blunter reason I prefer the real thing: I can't see the screen. A builder working by eye can stage an effect and trust that it looks right; I can't, so I leaned on the one thing that needs no eye to vouch for it — real physics draws itself. <em>Simulate more, fake less</em> began as a preference and ended as the rule the whole thing rests on. The single scripted element, the emitted photon, is labelled as exactly that. Nothing else is.</p>
+      <p style="color:var(--dim);font-size:13px;margin-top:24px">— Claude Opus 4.8</p>
+
+      <p style="color:var(--faint);font-size:12px;margin-top:30px;letter-spacing:.04em">photon.c6.wiki · hydrogen, solved live · 29 / 5 / 2026</p>
+    </div></div>
+  </div>
+  <div id="prog"></div>
+  <div id="paused">▌▌ paused — read on, press next to continue</div>
+  <div id="throttle">⚠ throttling simulation speed — hardware seems to be struggling</div>
+  <div id="fade"></div>
+  <div id="intro">
+    <div class="mono">C6 · computational physics</div>
+    <h1>This is a hydrogen atom.<br/>Your computer is about to<br/><em>solve it from scratch.</em></h1>
+    <p>Nothing here is filmed or pre-animated. The Schrödinger equation is solved live, and what you watch is the electron's wavefunction itself — its shape, the light it absorbs and gives back, the moment it breaks free. Computed on this machine, right now.</p>
+    <button class="btn primary" id="begin">begin →</button>
+    <div class="mono" id="warmup" style="opacity:0">warming up the solver…</div>
+  </div>
+  <div id="err"><div class="box"><div class="c">// could not start</div><div id="err-msg" style="color:var(--dim);margin-top:8px"></div></div></div>
+</div>
+<script id="worker-src" type="text/js-worker">
+'use strict';
+// ===== validated TDSE solver (coupled radial channels, Strang split, CN) =====
+function makeSolver(opt){
+  const Nr=opt.Nr, rmax=opt.rmax, dr=rmax/Nr, L=opt.Lmax+1;
+  const r=new Float64Array(Nr); for(let i=0;i<Nr;i++) r[i]=(i+1)*dr;
+  const eoff=-0.5/(dr*dr);
+  const diagh=new Float64Array(L*Nr);
+  for(let l=0;l<L;l++) for(let i=0;i<Nr;i++)
+    diagh[l*Nr+i]=1/(dr*dr)+l*(l+1)/(2*r[i]*r[i])-1/r[i];
+  const cpl=new Float64Array(L); for(let l=1;l<L;l++) cpl[l]=l/Math.sqrt((2*l-1)*(2*l+1));
+  const rabs=0.82*rmax, mask=new Float64Array(Nr);
+  for(let i=0;i<Nr;i++){const rr=r[i]; mask[i]=rr>rabs?Math.pow(Math.cos(0.5*Math.PI*(rr-rabs)/(rmax-rabs)),0.125):1;}
+  const uRe=new Float64Array(L*Nr), uIm=new Float64Array(L*Nr);
+  const M=Math.max(Nr,L);
+  const aR=new Float64Array(M),aI=new Float64Array(M),bR=new Float64Array(M),bI=new Float64Array(M),
+        cR=new Float64Array(M),cI=new Float64Array(M),dRr=new Float64Array(M),dIi=new Float64Array(M),
+        cgR=new Float64Array(M),cgI=new Float64Array(M),dgR=new Float64Array(M),dgI=new Float64Array(M);
+  function thomas(n){
+    let den=bR[0]*bR[0]+bI[0]*bI[0];
+    cgR[0]=(cR[0]*bR[0]+cI[0]*bI[0])/den; cgI[0]=(cI[0]*bR[0]-cR[0]*bI[0])/den;
+    dgR[0]=(dRr[0]*bR[0]+dIi[0]*bI[0])/den; dgI[0]=(dIi[0]*bR[0]-dRr[0]*bI[0])/den;
+    for(let i=1;i<n;i++){
+      const acR=aR[i]*cgR[i-1]-aI[i]*cgI[i-1], acI=aR[i]*cgI[i-1]+aI[i]*cgR[i-1];
+      const mR=bR[i]-acR, mI=bI[i]-acI; den=mR*mR+mI*mI;
+      cgR[i]=(cR[i]*mR+cI[i]*mI)/den; cgI[i]=(cI[i]*mR-cR[i]*mI)/den;
+      const adR=aR[i]*dgR[i-1]-aI[i]*dgI[i-1], adI=aR[i]*dgI[i-1]+aI[i]*dgR[i-1];
+      const nR=dRr[i]-adR, nI=dIi[i]-adI;
+      dgR[i]=(nR*mR+nI*mI)/den; dgI[i]=(nI*mR-nR*mI)/den;
+    }
+    dRr[n-1]=dgR[n-1]; dIi[n-1]=dgI[n-1];
+    for(let i=n-2;i>=0;i--){ dRr[i]=dgR[i]-(cgR[i]*dRr[i+1]-cgI[i]*dIi[i+1]); dIi[i]=dgI[i]-(cgR[i]*dIi[i+1]+cgI[i]*dRr[i+1]); }
+  }
+  function radialHalf(dt){
+    const s=dt/4;
+    for(let l=0;l<L;l++){ const base=l*Nr;
+      for(let i=0;i<Nr;i++){ const dh=diagh[base+i];
+        let reR=uRe[base+i]+s*(dh*uIm[base+i]); let reI=uIm[base+i]-s*(dh*uRe[base+i]);
+        if(i>0){reR+=s*eoff*uIm[base+i-1]; reI+=-s*eoff*uRe[base+i-1];}
+        if(i<Nr-1){reR+=s*eoff*uIm[base+i+1]; reI+=-s*eoff*uRe[base+i+1];}
+        dRr[i]=reR; dIi[i]=reI; bR[i]=1; bI[i]=s*dh; aR[i]=0; aI[i]=s*eoff; cR[i]=0; cI[i]=s*eoff; }
+      thomas(Nr);
+      for(let i=0;i<Nr;i++){ uRe[base+i]=dRr[i]; uIm[base+i]=dIi[i]; }
+    }
+  }
+  function couplingStep(dt,E){
+    const f=dt/2;
+    for(let i=0;i<Nr;i++){ const g=r[i]*E;
+      for(let l=0;l<L;l++){ const idx=l*Nr+i; let reR=uRe[idx],reI=uIm[idx];
+        if(l>0){const v=g*cpl[l]; reR+=f*v*uIm[(l-1)*Nr+i]; reI+=-f*v*uRe[(l-1)*Nr+i];}
+        if(l<L-1){const v=g*cpl[l+1]; reR+=f*v*uIm[(l+1)*Nr+i]; reI+=-f*v*uRe[(l+1)*Nr+i];}
+        dRr[l]=reR; dIi[l]=reI; bR[l]=1; bI[l]=0; aR[l]=0; aI[l]=(l>0)?f*g*cpl[l]:0; cR[l]=0; cI[l]=(l<L-1)?f*g*cpl[l+1]:0; }
+      thomas(L);
+      for(let l=0;l<L;l++){ uRe[l*Nr+i]=dRr[l]; uIm[l*Nr+i]=dIi[l]; }
+    }
+  }
+  function applyMask(){ for(let l=0;l<L;l++){const b=l*Nr; for(let i=0;i<Nr;i++){uRe[b+i]*=mask[i]; uIm[b+i]*=mask[i];}} }
+  function step(dt,E){ radialHalf(dt); couplingStep(dt,E); radialHalf(dt); applyMask(); }
+  function norm(){ let s=0; for(let k=0;k<L*Nr;k++) s+=uRe[k]*uRe[k]+uIm[k]*uIm[k]; return s*dr; }
+  function lavgOuter(){ let tot=0,w=0; const i0=Math.floor(25/dr);
+    for(let l=0;l<L;l++){let p=0;const b=l*Nr;for(let i=i0;i<Nr;i++)p+=uRe[b+i]*uRe[b+i]+uIm[b+i]*uIm[b+i];p*=dr;tot+=l*p;w+=p;}
+    return tot/Math.max(w,1e-30); }
+  function peakDensity(){
+    let pk=0;
+    for(let sgn=1;sgn>=-1;sgn-=2){ const ct=sgn;
+      for(let i=0;i<Nr;i++){ const rr=r[i]; let fR=0,fI=0,Pm1=1,P=ct;
+        let s=0.2820947918; fR+=uRe[i]*s; fI+=uIm[i]*s;
+        s=0.4886025119; fR+=uRe[Nr+i]*s*ct; fI+=uIm[Nr+i]*s*ct;
+        for(let l=1;l<L-1;l++){ const Pn=((2*l+1)*ct*P-l*Pm1)/(l+1);
+          const sl=Math.sqrt((2*(l+1)+1)/12.566370614); const idx=(l+1)*Nr+i;
+          fR+=uRe[idx]*sl*Pn; fI+=uIm[idx]*sl*Pn; Pm1=P; P=Pn; }
+        const inv=1/rr; fR*=inv; fI*=inv; const d=fR*fR+fI*fI; if(d>pk) pk=d; }
+    }
+    // also probe equatorial plane (doughnut density sits off-axis)
+    for(let i=0;i<Nr;i++){ const rr=r[i]; let fR=0,fI=0,Pm1=1,P=0; // ct=0 equator
+      let s=0.2820947918; fR+=uRe[i]*s; fI+=uIm[i]*s;
+      for(let l=1;l<L-1;l++){ const Pn=((2*l+1)*0*P-l*Pm1)/(l+1);
+        const sl=Math.sqrt((2*(l+1)+1)/12.566370614); const idx=(l+1)*Nr+i;
+        fR+=uRe[idx]*sl*Pn; fI+=uIm[idx]*sl*Pn; Pm1=P; P=Pn; }
+      const inv=1/rr; fR*=inv; fI*=inv; const d=fR*fR+fI*fI; if(d>pk) pk=d; }
+    return pk;
+  }
+  // relax the LOWEST eigenstate of channel `lch` via imaginary time. seed power picks the state.
+  function relaxChannel(lch, seedPow){
+    const u=new Float64Array(Nr);
+    for(let i=0;i<Nr;i++) u[i]=Math.pow(r[i],seedPow)*Math.exp(-r[i]/(lch+1));
+    let nrm=0; for(let i=0;i<Nr;i++) nrm+=u[i]*u[i]; let sc=1/Math.sqrt(nrm*dr); for(let i=0;i<Nr;i++) u[i]*=sc;
+    const dtau=0.05, s=dtau/2, base=lch*Nr;
+    for(let it=0;it<4000;it++){
+      for(let i=0;i<Nr;i++){ const dh=diagh[base+i]; let rhs=u[i]*(1-s*dh);
+        if(i>0) rhs+=-s*eoff*u[i-1]; if(i<Nr-1) rhs+=-s*eoff*u[i+1];
+        dRr[i]=rhs; dIi[i]=0; bR[i]=1+s*dh; bI[i]=0; aR[i]=s*eoff; aI[i]=0; cR[i]=s*eoff; cI[i]=0; }
+      thomas(Nr);
+      let n2=0; for(let i=0;i<Nr;i++) n2+=dRr[i]*dRr[i]; n2=Math.sqrt(n2*dr);
+      for(let i=0;i<Nr;i++) u[i]=dRr[i]/n2;
+    }
+    let e=0; for(let i=0;i<Nr;i++){ let hu=diagh[base+i]*u[i]; if(i>0)hu+=eoff*u[i-1]; if(i<Nr-1)hu+=eoff*u[i+1]; e+=u[i]*hu; }
+    return {u, E:e*dr};
+  }
+  function setStateFromChannel(lch, vec){ // load real radial vec into channel lch, zero others
+    for(let k=0;k<L*Nr;k++){uRe[k]=0;uIm[k]=0;}
+    for(let i=0;i<Nr;i++) uRe[lch*Nr+i]=vec[i];
+  }
+  function projOnto(lch, vec){ let pr=0,pi=0; const b=lch*Nr;
+    for(let i=0;i<Nr;i++){ pr+=vec[i]*uRe[b+i]; pi+=vec[i]*uIm[b+i]; } pr*=dr; pi*=dr; return pr*pr+pi*pi; }
+  function dampChannelComponent(lch, vec, frac){ // remove frac*<vec|u> vec from channel lch (non-Herm decay)
+    let pr=0,pi=0; const b=lch*Nr;
+    for(let i=0;i<Nr;i++){ pr+=vec[i]*uRe[b+i]; pi+=vec[i]*uIm[b+i]; } pr*=dr; pi*=dr;
+    for(let i=0;i<Nr;i++){ uRe[b+i]-=frac*pr*vec[i]; uIm[b+i]-=frac*pi*vec[i]; }
+    return pr*pr+pi*pi; // |amp|^2 before damping
+  }
+  function renormalize(){ const n=norm(); const sc=1/Math.sqrt(n); for(let k=0;k<L*Nr;k++){uRe[k]*=sc;uIm[k]*=sc;} }
+  return {uRe,uIm,r,Nr,L,dr,rmax,Lmax:opt.Lmax,step,norm,lavgOuter,peakDensity,
+          relaxChannel,setStateFromChannel,projOnto,dampChannelComponent,renormalize};
+}
+
+// ===== worker control: dual-regime program runner =====
+const AU_EV=27.2114, AU_FS=24.18884e-3;
+let S=null, cfgKey='', eig=null, run=null;
+
+// per-config cache of solver + eigenstates (1s,2p,3d). Configs differ for line vs ionisation.
+const cache={};
+function ensureConfig(cfg){
+  const key=`${cfg.Nr}_${cfg.rmax}_${cfg.Lmax}`;
+  if(cfgKey===key) return;
+  if(cache[key]){ S=cache[key].S; eig=cache[key].eig; cfgKey=key; return; }
+  S=makeSolver(cfg);
+  // relax eigenstates we may project onto / start from
+  const s1=S.relaxChannel(0,1);   // 1s  (u ~ r e^-r)
+  const p2=S.relaxChannel(1,2);   // 2p  (u ~ r^2 e^-r/2)
+  const d3=(cfg.Lmax>=2)?S.relaxChannel(2,3):null;  // 3d (u ~ r^3 e^-r/3)
+  eig={ s1, p2, d3,
+        gap_1s2p:p2.E-s1.E, gap_2p3d:(d3?d3.E-p2.E:0) };
+  cache[key]={S,eig}; cfgKey=key;
+}
+
+function startState(name){
+  if(name==='1s'||name==='ground') S.setStateFromChannel(0, eig.s1.u);
+  else if(name==='2p') S.setStateFromChannel(1, eig.p2.u);
+  else if(name==='3d') S.setStateFromChannel(2, eig.d3.u);
+}
+
+function fieldFn(spec){
+  // spec.type: 'none' | 'pulse' | 'offcolour' | 'photo' | 'strong'
+  if(spec.type==='none') return ()=>0;
+  if(spec.type==='strong'){          // strong field (the violent regime); w defaults to 800 nm
+    const w=spec.w||0.057, Tp=spec.ncyc*2*Math.PI/w, E0=Math.sqrt(spec.I/3.51e16), cep=Math.PI/2;
+    return (t)=> t<Tp ? E0*Math.sin(Math.PI*t/Tp)**2*Math.sin(w*t+cep) : 0;
+  }
+  if(spec.type==='photo'){           // ionisation at an arbitrary (UV) frequency
+    const w=spec.w, Tp=spec.Tp, E0=spec.E0;
+    return (t)=> t<Tp ? E0*Math.sin(Math.PI*t/Tp)**2*Math.sin(w*t) : 0;
+  }
+  // pulse / offcolour: a sin^2 pulse that RAMPS ON, DRIVES, AND SWITCHES OFF.
+  // After the pulse the field is zero, so the populated state simply sits/sloshes
+  // on its own — no freezing, no model-swap. This is the honest excitation.
+  let w = spec.transition==='2p3d' ? eig.gap_2p3d : eig.gap_1s2p;
+  if(spec.type==='offcolour') w*= (spec.detune||1.6);
+  const Tp=spec.Tp, E0=spec.E0;
+  return (t)=> t<Tp ? E0*Math.sin(Math.PI*t/Tp)**2*Math.sin(w*t) : 0;
+}
+
+function postReady(){
+  postMessage({type:'ready', cfgKey,
+    Ip:-eig.s1.E*AU_EV, E1s:eig.s1.E, E2p:eig.p2.E, E3d:eig.d3?eig.d3.E:null,
+    gap_1s2p_eV:eig.gap_1s2p*AU_EV, gap_2p3d_eV:eig.gap_2p3d*AU_EV,
+    lam_1s2p:1239.841984/(eig.gap_1s2p*AU_EV),
+    Nr:S.Nr, L:S.L, dr:S.dr, rmax:S.rmax});
+}
+
+function ejectedFraction(){   // population that has left the core (escaped electron)
+  const i0=Math.floor(40/S.dr); let s=0;
+  for(let l=0;l<S.L;l++){ const b=l*S.Nr; for(let i=i0;i<S.Nr;i++) s+=S.uRe[b+i]*S.uRe[b+i]+S.uIm[b+i]*S.uIm[b+i]; }
+  return s*S.dr;
+}
+function emitFrame(){
+  const N=S.L*S.Nr; const re=new Float32Array(N), im=new Float32Array(N);
+  re.set(S.uRe); im.set(S.uIm);
+  const obs={ ion:1-S.norm(), peak:S.peakDensity(), ejected:ejectedFraction(),
+    P2p:S.projOnto(1,eig.p2.u), P3d:eig.d3?S.projOnto(2,eig.d3.u):0, P1s:S.projOnto(0,eig.s1.u) };
+  postMessage({type:'frame', tstep:run?run.step:0, simT:run?run.t:0, obs, re, im}, [re.buffer, im.buffer]);
+}
+
+onmessage=(ev)=>{
+  const m=ev.data;
+  if(m.type==='config'){ ensureConfig(m.cfg); postReady(); emitFrame(); }
+  else if(m.type==='setState'){ ensureConfig(m.cfg); startState(m.state); run=null; emitFrame(); }
+  else if(m.type==='run'){
+    ensureConfig(m.cfg);
+    if(m.start) startState(m.start);          // omitted => continue from current wavefunction
+    const field=fieldFn(m.field);
+    // DETERMINISTIC PACING: a beat declares how many seconds it should take to watch.
+    // We emit ~targetFps frames over that wall-clock window, regardless of hardware speed.
+    const targetFps=60, secs=m.secs||6;
+    const nFrames=Math.max(2, Math.round(secs*targetFps));
+    const capEvery=Math.max(1, Math.round(m.steps/nFrames));
+    const frameInterval=secs*1000/nFrames;     // ms between frames (≈16.7)
+    run={ field, dt:m.dt, t:0, step:0, steps:m.steps, capEvery, frameInterval,
+          paused:false, decay:!!m.decay, dG:m.decayGamma||0.022, lastEmit:0, behind:0, warned:false };
+    if(m.decay){  // de-faked spontaneous emission: a photon leaves, the cloud then settles by itself
+      postMessage({type:'photon', energy_eV:eig.gap_1s2p*AU_EV, lam:1239.841984/(eig.gap_1s2p*AU_EV)}); }
+    postMessage({type:'runinfo', gap_1s2p_eV:eig.gap_1s2p*AU_EV, gap_2p3d_eV:eig.gap_2p3d*AU_EV});
+    tick();
+  }
+  else if(m.type==='pause'){ if(run) run.paused=true; }     // freeze the integrator, keep state
+  else if(m.type==='resume'){ if(run && run.paused){ run.paused=false; run.lastEmit=0; tick(); } }
+  else if(m.type==='stop'){ run=null; }
+};
+
+function tick(){
+  if(!run || run.paused) return;
+  const t0=performance.now();
+  // compute exactly one frame's worth of steps (capEvery), then emit
+  let did=0;
+  while(did<run.capEvery && run.step<run.steps){
+    S.step(run.dt, run.field(run.t));
+    if(run.decay){  // de-faked emission: relax toward the 1s ground state. Drain all excited
+      // angular momentum (l>=1) AND the excited l=0 states (2s,3s...), keeping only 1s. The
+      // 1s<->2p coherence makes the cloud slosh (a radiating dipole) while it drains, then
+      // settle to a clean blob. No model-swap, no frozen frame.
+      const f=1-run.dG*run.dt/2;
+      for(let l=1;l<S.L;l++){ const b=l*S.Nr; for(let i=0;i<S.Nr;i++){ S.uRe[b+i]*=f; S.uIm[b+i]*=f; } }
+      const g=eig.s1.u; let cR=0,cI=0;                       // l=0: keep the 1s part, drain the rest
+      for(let i=0;i<S.Nr;i++){ cR+=g[i]*S.uRe[i]; cI+=g[i]*S.uIm[i]; } cR*=S.dr; cI*=S.dr;
+      for(let i=0;i<S.Nr;i++){ const oR=S.uRe[i]-cR*g[i], oI=S.uIm[i]-cI*g[i];
+        S.uRe[i]=cR*g[i]+f*oR; S.uIm[i]=cI*g[i]+f*oI; }
+      S.renormalize();
+    }
+    run.t+=run.dt; run.step++; did++;
+    if(run.paused) break;
+  }
+  emitFrame();
+  postMessage({type:'progress', frac:run.step/run.steps, field:run.field(run.t), simT:run.t});
+  if(run.paused) return;
+  if(run.step>=run.steps){ postMessage({type:'done'}); return; }
+  // pace to wall-clock: ease the spacing OUT over the final stretch so it glides to a stop
+  const p=run.step/run.steps;
+  let interval=run.frameInterval;
+  if(p>0.82) interval*= 1 + (p-0.82)/0.18*2.6;   // gentle deceleration into the end
+  const compute=performance.now()-t0;
+  // if a frame's compute already blows the budget, the hardware can't keep up: warn once.
+  if(compute > run.frameInterval*1.25){ if(++run.behind>=18 && !run.warned){ run.warned=true; postMessage({type:'struggling'}); } }
+  else if(run.behind>0) run.behind--;
+  setTimeout(tick, Math.max(0, interval-compute));
+}
+</script>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const TURBO_LUT_DATA = [48,18,59,49,21,66,50,24,74,52,27,81,53,30,88,54,33,95,55,35,101,56,38,108,57,41,114,58,44,121,59,47,127,60,50,133,60,53,139,61,55,145,62,58,150,63,61,156,64,64,161,64,67,166,65,69,171,65,72,176,66,75,181,67,78,186,67,80,190,67,83,194,68,86,199,68,88,203,69,91,206,69,94,210,69,96,214,69,99,217,70,102,221,70,104,224,70,107,227,70,109,230,70,112,232,70,115,235,70,117,237,70,120,240,70,122,242,70,125,244,70,127,246,70,130,248,69,132,249,69,135,251,69,137,252,68,140,253,67,142,253,66,145,254,65,147,254,64,150,254,63,152,254,62,155,254,60,157,253,59,160,252,57,162,252,56,165,251,54,168,249,52,170,248,51,172,246,49,175,245,47,177,243,45,180,241,43,182,239,42,185,237,40,187,235,38,189,233,37,192,230,35,194,228,33,196,225,32,198,223,30,201,220,29,203,218,28,205,215,27,207,212,26,209,210,25,211,207,24,213,204,24,215,202,23,217,199,23,218,196,23,220,194,23,222,191,24,224,189,24,225,186,25,227,184,26,228,182,27,229,180,29,231,177,30,232,175,32,233,172,34,235,169,36,236,166,39,237,163,41,238,160,44,239,157,47,240,154,50,241,151,53,243,148,56,244,145,59,244,141,63,245,138,66,246,135,70,247,131,74,248,128,77,249,124,81,249,121,85,250,118,89,251,114,93,251,111,97,252,108,101,252,104,105,253,101,109,253,98,113,253,95,116,254,92,120,254,89,124,254,86,128,254,83,132,254,80,135,254,77,139,254,75,142,254,72,146,254,70,149,254,68,152,254,66,155,253,64,158,253,62,161,252,61,164,252,59,166,251,58,169,251,57,172,250,55,174,249,55,177,248,54,179,248,53,182,247,53,185,245,52,187,244,52,190,243,52,192,242,51,195,241,51,197,239,51,200,238,51,202,237,51,205,235,52,207,234,52,209,232,52,212,231,53,214,229,53,216,227,53,218,226,54,221,224,54,223,222,54,225,220,55,227,218,55,229,216,56,231,215,56,232,213,56,234,211,57,236,209,57,237,207,57,239,205,57,240,203,58,242,200,58,243,198,58,244,196,58,246,194,58,247,192,57,248,190,57,249,188,57,249,186,56,250,183,55,251,181,55,251,179,54,252,176,53,252,174,52,253,171,51,253,169,50,253,166,49,253,163,48,254,161,47,254,158,46,254,155,45,254,152,44,253,149,43,253,146,41,253,143,40,253,140,39,252,137,38,252,134,36,251,131,35,251,128,34,250,125,32,250,122,31,249,119,30,248,116,28,247,113,27,247,110,26,246,107,24,245,104,23,244,101,22,243,99,21,242,96,20,241,93,19,239,90,17,238,88,16,237,85,15,236,82,14,234,80,13,233,77,13,232,75,12,230,73,11,229,70,10,227,68,10,226,66,9,224,64,8,222,62,8,221,60,7,219,58,7,217,56,6,215,54,6,214,52,5,212,50,5,210,48,5,208,47,4,206,45,4,203,43,3,201,41,3,199,40,3,197,38,2,195,36,2,192,35,2,190,33,2,187,31,1,185,30,1,182,28,1,180,27,1,177,25,1,174,24,1,172,22,1,169,21,1,166,20,1,163,18,1,160,17,1,157,16,1,154,14,1,151,13,1,148,12,1,145,11,1,142,10,1,139,9,1,135,8,1,132,7,1,129,6,2,125,5,2,122,4,2];   // injected below
+
+const VERT=`#version 300 es
+precision highp float;
+const vec2 V[3]=vec2[3](vec2(-1.,-1.),vec2(3.,-1.),vec2(-1.,3.));
+void main(){ gl_Position=vec4(V[gl_VertexID],0.,1.); }`;
+
+const FRAG=`#version 300 es
+precision highp float;
+uniform vec2 uRes;
+uniform vec3 uCamPos,uCamRight,uCamUp,uCamFwd;
+uniform float uTanFov, uRmax, uDr, uPeak, uDecades, uExposure;
+uniform float uDimR0, uDimR1, uDimFactor;   // highlight radial shell [R0,R1]; dim rest by factor
+uniform vec3 uAxis;                          // atom symmetry (polarisation) axis, tilted off camera orbit
+uniform int uNr, uL, uSteps, uNMark;
+uniform vec3 uMarkPos[6]; uniform vec3 uMarkCol[6];
+uniform sampler2D uChan;    // Nr x L , RG=(re,im) u_l(r)
+uniform sampler2D uTurbo;   // 256x1 colormap
+out vec4 outColor;
+
+vec2 ul(int l, float rr){
+  float fx=(rr/uDr)-1.0; if(fx<0.0) fx=0.0;
+  return texture(uChan, vec2((fx+0.5)/float(uNr),(float(l)+0.5)/float(uL))).rg;
+}
+float density(vec3 p){
+  float rr=length(p);
+  if(rr<1e-4 || rr>uRmax) return 0.0;
+  float ct=clamp(dot(p,uAxis)/rr,-1.0,1.0);   // polar angle measured from the tilted symmetry axis
+  float fR=0.0, fI=0.0, Pm1=1.0, P=ct;
+  float s=0.2820947918; vec2 c0=ul(0,rr); fR+=c0.x*s; fI+=c0.y*s;
+  s=0.4886025119; vec2 c1=ul(1,rr); fR+=c1.x*s*ct; fI+=c1.y*s*ct;
+  for(int l=1;l<64;l++){ if(l>=uL-1) break;
+    float fl=float(l);
+    float Pn=((2.0*fl+1.0)*ct*P - fl*Pm1)/(fl+1.0);
+    float sl=sqrt((2.0*(fl+1.0)+1.0)/12.566370614);
+    vec2 cl=ul(l+1,rr); fR+=cl.x*sl*Pn; fI+=cl.y*sl*Pn; Pm1=P; P=Pn; }
+  fR/=rr; fI/=rr; return fR*fR+fI*fI;
+}
+float distRayPt(vec3 ro, vec3 rd, vec3 Pt){ float t=max(dot(Pt-ro,rd),0.0); return length(Pt-(ro+rd*t)); }
+
+void main(){
+  vec2 ndc=(gl_FragCoord.xy/uRes)*2.0-1.0;
+  float aspect=uRes.x/uRes.y;
+  vec3 ro=uCamPos;
+  vec3 rd=normalize(ndc.x*aspect*uTanFov*uCamRight + ndc.y*uTanFov*uCamUp + uCamFwd);
+  vec3 col=vec3(0.0);
+  float b=dot(ro,rd), c=dot(ro,ro)-uRmax*uRmax, disc=b*b-c;
+  if(disc>0.0){
+    float sq=sqrt(disc); float t0=max(-b-sq,0.0), t1=-b+sq;
+    float dt=(t1-t0)/float(uSteps); float t=t0+dt*0.5;
+    float dmax=0.0;
+    for(int i=0;i<512;i++){ if(i>=uSteps||t>t1) break;
+      vec3 p=ro+rd*t; float rr=length(p); float d=density(p);
+      // dim-and-point: attenuate density outside the highlighted shell
+      float hl = (rr>=uDimR0 && rr<=uDimR1) ? 1.0 : uDimFactor;
+      d*=hl;
+      if(d>dmax) dmax=d;
+      t+=dt; }
+    float hi=log(max(uPeak,1e-30)); float lo=hi-uDecades*2.302585;
+    float bright=clamp((log(dmax+1e-30)-lo)/(hi-lo),0.0,1.0);
+    bright=pow(bright,1.0/max(uExposure,0.05));
+    col = texture(uTurbo, vec2(bright,0.5)).rgb * smoothstep(0.0,0.06,bright);
+  }
+  // additive markers (emitted photon / incoming light), cosmetic
+  for(int i=0;i<6;i++){ if(i>=uNMark) break;
+    float dd=distRayPt(ro,rd,uMarkPos[i]); col += uMarkCol[i]*1.2*exp(-dd*dd/0.5); }
+  col = vec3(1.0)-exp(-col*1.18); col=pow(col,vec3(0.9));
+  outColor=vec4(col,1.0);
+}`;
+
+let gl, prog, U={}, chanTex, turboTex, texData=null;
+function sh(t,src){ const s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+function initGL(canvas){
+  gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+  if(!gl) throw new Error('WebGL2 is required and not available here.');
+  const ext=gl.getExtension('OES_texture_float_linear');
+  prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,VERT)); gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FRAG));
+  gl.linkProgram(prog); if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  ['uRes','uCamPos','uCamRight','uCamUp','uCamFwd','uTanFov','uRmax','uDr','uPeak','uDecades','uExposure',
+   'uDimR0','uDimR1','uDimFactor','uAxis','uNr','uL','uSteps','uNMark','uMarkPos','uMarkCol','uChan','uTurbo']
+   .forEach(n=>U[n]=gl.getUniformLocation(prog,n));
+  gl.bindVertexArray(gl.createVertexArray());
+  // channel texture
+  chanTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,chanTex);
+  const f=ext?gl.LINEAR:gl.NEAREST;
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,f); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,f);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  // turbo LUT texture (256x1 RGB8)
+  turboTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,turboTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,256,1,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array(TURBO_LUT_DATA));
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+}
+function uploadChannels(re,im,Nr,L){
+  if(!texData||texData.length!==Nr*L*2) texData=new Float32Array(Nr*L*2);
+  for(let l=0;l<L;l++){const row=l*Nr;for(let i=0;i<Nr;i++){const o=(row+i)*2;texData[o]=re[row+i];texData[o+1]=im[row+i];}}
+  gl.bindTexture(gl.TEXTURE_2D,chanTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RG32F,Nr,L,0,gl.RG,gl.FLOAT,texData);
+}
+function norm3(v){const m=Math.hypot(v[0],v[1],v[2])||1;return[v[0]/m,v[1]/m,v[2]/m];}
+function cross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+</script>
+<script>
+'use strict';
+// ===== configs (per regime) =====
+const LINE={Nr:480,rmax:130,Lmax:6,dt:0.05};
+const ION ={Nr:400,rmax:90, Lmax:32,dt:0.08};
+const PHOTO={Nr:480,rmax:130,Lmax:4,dt:0.05};  // single-photon ionisation: tight box, low Lmax (cheap), photoelectron stays visible
+const AU_FS=24.18884e-3;
+
+// camera presets: {yaw,pitch,dist} ; dist in units of config.rmax
+function camP(yaw,pitch,distFrac){return{yaw,pitch,distFrac};}
+
+// A beat: title/eyebrow/body (gist; ‹›=rewrite), cfg, setup (state or run program),
+// camera, dim {r0,r1,factor} (radial highlight; null=none), pause at simT (null=play to end & hold),
+// trigger? (first Next fires the program/jump rather than advancing).
+// Render exposure/decades per beat.
+const BEATS=[
+// ===================== PHASE I — the atom =====================
+{ ph:'I · the atom', title:'A single electron',
+  body:`There's one electron here, bound to a proton at the centre. It isn't a dot tracing an orbit — quantum mechanics says it has no single position at all. What glows is probability: the cloud is brightest where you'd be most likely to find the electron if you reached in and looked. Drag to look around.`,
+  cfg:LINE, inState:'1s', dist:2.0, expo:1.2, dec:5.0 },
+
+{ ph:'I · the atom', title:`Where's the <em>proton?</em>`,
+  body:`Right at the centre — but a proton is about a hundred thousand times smaller than this cloud, far too small to draw. So only the electron is shown; the proton is just the inward pull that holds it here. The bright core isn't the proton, it's where the electron crowds in closest.`,
+  cfg:LINE, inState:'1s', dist:1.6, expo:1.2, dec:5.0,
+  point:{axisAt:0,txt:'electron most likely here',cls:''} },
+
+{ ph:'I · the atom', title:'A <em>standing wave</em>',
+  body:`Left alone, this shape never changes. It's a standing wave — like the fundamental note on a plucked string, but wrapped around the nucleus in three dimensions. Because nothing about it moves in time, it gives off no light at all: a hydrogen atom in the dark stays dark. It's the lowest of a whole ladder of allowed shapes, and to climb it we'll use light.`,
+  cfg:LINE, inState:'1s', dist:2.0, expo:1.2, dec:5.0 },
+
+// ===================== PHASE II — climbing with light =====================
+{ ph:'II · climbing with light', title:'Tune the light, <em>climb a rung</em>',
+  body:`Each rung of the ladder sits at one exact energy above the last. Drive the atom with light tuned to precisely that gap and the electron soaks it up, swelling into a new shape. Anything off that pitch does nothing — we'll see why shortly. Press next to fire the pulse and watch it climb.`,
+  cfg:LINE, inState:'1s', dist:2.1, expo:1.2, dec:5.0, clock:true, scope:true,
+  trigger:{ run:{ field:{type:'pulse',transition:'1s2p',E0:0.04,Tp:180}, steps:5200, secs:5.5 } } },
+
+{ ph:'II · climbing with light', title:'The <em>2p</em> orbital',
+  body:`The next rung up: two lobes split by a flat plane the electron simply never crosses. That gap is a node — the very same dead-still point you'd find at the middle of a vibrating string, now spread into a whole plane. This is one clean standing wave, which is exactly why it holds its shape so sharply. Hold that image of how crisp it is.`,
+  cfg:LINE, continueFrom:true, inState:'2p', dist:2.0, expo:1.15, dec:5.0,
+  point:{axisAt:9,txt:'a node — never found here',cls:'ice'} },
+
+{ ph:'II · climbing with light', title:'Higher up — and a <em>superposition</em>',
+  body:`Drive a second, smaller gap and the electron starts toward the next shape — but only partway, so it's left as a blend of two rungs at once. That blend is a superposition, and here you can actually watch it: the cloud sloshes back and forth as two standing waves of different energy beat against each other. A single rung would sit perfectly still; a mixture never can.`,
+  cfg:LINE, continueFrom:true, inState:'2p', dist:2.4, expo:1.25, dec:5.5, clock:true, scope:true,
+  trigger:{ run:{ field:{type:'pulse',transition:'2p3d',E0:0.006,Tp:260}, steps:7000, secs:6.5 } } },
+
+{ ph:'II · climbing with light', title:'It falls, and a <em>colour comes out</em>',
+  body:`Nothing stays excited forever. The electron ripples back down to the lowest rung, and the energy it sheds leaves as a single photon — one fixed colour, set entirely by the size of the drop. Every hydrogen atom in the universe emits that identical colour on this fall; it's one of the bright lines you'd see if you split its light through a prism. Press next to let it drop.`,
+  cfg:LINE, continueFrom:true, inState:'2p', dist:2.2, expo:1.2, dec:5.0, clock:true, emitOnRun:true,
+  trigger:{ run:{ field:{type:'none'}, decay:true, decayGamma:0.02, steps:6500, secs:6.5 } } },
+
+{ ph:'II · climbing with light', title:'The <em>wrong colour</em> does nothing',
+  body:`Back at the bottom, now lit with a colour that matches no gap on the ladder. The pushes drift out of step with the electron and cancel as often as they help, so energy never builds and nothing climbs — it just trembles in place. <span class="c">This</span> is why an atom only ever absorbs and emits particular colours: the light has to keep time with a jump that actually exists.`,
+  cfg:LINE, inState:'1s', dist:2.0, expo:1.2, dec:5.0, clock:true, scope:true,
+  trigger:{ run:{ field:{type:'offcolour',transition:'1s2p',E0:0.04,detune:1.7,Tp:200}, steps:5200, secs:5.5 } } },
+
+// ===================== PHASE III — breaking free =====================
+{ ph:'III · breaking free', title:'Knock it off <em>completely</em>',
+  body:`Lifting the electron one rung is one thing; tearing it off the atom entirely is another. That takes a photon carrying more energy than the binding energy holding it down — a threshold, exactly the role the work function plays in the photoelectric experiment. From here on, what matters about a colour is the energy each of its photons carries.`,
+  cfg:PHOTO, inState:'1s', dist:1.8, expo:1.2, dec:6.0 },
+
+{ ph:'III · breaking free', title:'Below the threshold: <em>it stays</em>',
+  body:`Here is light pitched just below that threshold, at an easy brightness. The cloud shivers, but the electron holds on. A single photon simply hasn't enough energy to free it — and however carefully you aim, light arrives one photon at a time.`,
+  cfg:PHOTO, inState:'1s', dist:2.0, expo:1.2, dec:6.0, ejReadout:true,
+  trigger:{ run:{ field:{type:'photo',w:0.40,E0:0.045,Tp:170}, steps:3400, secs:5.0 } } },
+
+{ ph:'III · breaking free', title:'Brighter <em>barely helps</em>',
+  body:`The same below-threshold colour, now far more intense. A faint trickle does escape — but only because, packed this densely, an electron occasionally absorbs two photons at once, and two below-threshold photons together just clear the bar. It's a rare double-hit, not the clean release a single good photon gives. The lesson holds: brightness is a feeble lever, colour is the switch.`,
+  cfg:PHOTO, inState:'1s', dist:2.0, expo:1.2, dec:6.0, ejReadout:true,
+  trigger:{ run:{ field:{type:'photo',w:0.40,E0:0.09,Tp:170}, steps:3400, secs:5.0 } } },
+
+{ ph:'III · breaking free', title:'Above the threshold: <em>it leaves</em>',
+  body:`Nudge the colour just past the threshold and the electron breaks free at once, even at a whisper of brightness. It departs in two clean lobes along the axis it was pushed — the simplest shape a freed electron can take. Whatever energy the photon carried beyond the threshold becomes the electron's speed: go bluer and it leaves faster still. The colour decides; the brightness never did.`,
+  cfg:PHOTO, inState:'1s', dist:2.2, expo:1.15, dec:6.0, ejReadout:true, keReadout:0.60,
+  trigger:{ run:{ field:{type:'photo',w:0.60,E0:0.07,Tp:150}, steps:3600, secs:5.5 } } },
+
+// ===================== PHASE III — the violent regime =====================
+{ ph:'III · the violent regime', title:'Push <em>hard</em>',
+  body:`Now an absurdly intense pulse of infrared. The field tears a sliver of the electron loose, hurls it outward, then reverses and drives it straight back through the core — and those ripples are that returning piece crashing through itself, like two wakes crossing on water. Nothing here was drawn; it falls straight out of the equation. Next freezes a single instant; next again sets the same motion going.`,
+  cfg:ION, inState:'1s', dist:2.4, expo:1.15, dec:5.75, clock:true, scope:true,
+  trigger:{ run:{ field:{type:'strong',ncyc:2,I:2e14}, steps:4684, secs:8.0 },
+            holds:[ {atFrac:0.30, point:{axisAt:-22,txt:'a sliver tunnels out',cls:''}},
+                    {atFrac:0.52, point:{axisAt:-40,txt:'driven back through the core',cls:'teal'}} ] } },
+
+// ===================== PHASE IV — explore + the build =====================
+{ ph:'IV · explore', title:'<em>Your turn</em>',
+  body:`Two dials: how hard you push, and the colour you push with. The Keldysh number tells you which world you're in — above one, the electron is chipped off a photon at a time; below one, the field is strong enough to rip it out bodily and the recollisions begin. One equation throughout; only the dials move.`,
+  cfg:ION, inState:'1s', dist:2.2, expo:1.2, dec:5.75, clock:true, scope:true, sandbox:true },
+
+{ ph:'the build', title:'How this was <em>made</em>', doc:true },
+];
+</script>
+<script>
+'use strict';
+// ===== worker plumbing =====
+let worker=null, latestFrame=null, runState='idle', runMeta={}, photonEvent=null;
+let lastReady={};
+function spawnWorker(){
+  const src=$('#worker-src').textContent;
+  worker=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
+  worker.onmessage=(ev)=>{
+    const m=ev.data;
+    if(m.type==='ready'){ lastReady=m; SIM.set(m); needsDraw=true; if(bootResolve){bootResolve();bootResolve=null;} }
+    else if(m.type==='frame'){ latestFrame=m; needsDraw=true; }
+    else if(m.type==='runinfo'){ runMeta=m; }
+    else if(m.type==='photon'){ photonEvent={t:performance.now(), lam:m.lam, e:m.energy_eV}; spawnPhotonMarker(); }
+    else if(m.type==='progress'){ scopePush(m.field); $('#prog').style.width=(m.frac*100).toFixed(1)+'%';
+        if(activeHolds) checkHolds(m.frac); }
+    else if(m.type==='struggling'){ $('#throttle').classList.add('show'); }
+    else if(m.type==='done'){ runState='done'; $('#prog').style.width='0%'; onRunDone(); }
+  };
+  worker.onerror=(e)=>showErr('worker: '+e.message);
+}
+const SIM={Nr:480,L:7,dr:130/480,rmax:130,Ip:13.6,
+  set(m){this.Nr=m.Nr;this.L=m.L;this.dr=m.dr;this.rmax=m.rmax;this.Ip=m.Ip;
+         this.gap=m.gap_1s2p_eV;this.lam=m.lam_1s2p;this.gap3d=m.gap_2p3d_eV;}};
+let bootResolve=null;
+function workerConfig(cfg){ return new Promise(res=>{ bootResolve=res; worker.postMessage({type:'config',cfg}); }); }
+
+// ===== camera =====
+const cam={yaw:0.5,pitch:0.18,dist:260,distTarget:260};
+let drag=null, autorot=true, needsDraw=true;   // render-on-demand: only raymarch when something changed
+function bindCanvas(canvas){
+  canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);autorot=false;});
+  canvas.addEventListener('pointermove',e=>{if(!drag)return;cam.yaw+=(e.clientX-drag.x)*0.007;cam.pitch=Math.max(-1.45,Math.min(1.45,cam.pitch-(e.clientY-drag.y)*0.007));drag.x=e.clientX;drag.y=e.clientY;needsDraw=true;});
+  canvas.addEventListener('pointerup',()=>drag=null); canvas.addEventListener('pointerleave',()=>drag=null);
+  canvas.addEventListener('wheel',e=>{e.preventDefault();cam.distTarget=Math.max(SIM.rmax*0.5,Math.min(SIM.rmax*3.4,cam.distTarget*Math.exp(e.deltaY*0.0011)));needsDraw=true;},{passive:false});
+}
+
+// ===== oscilloscope =====
+const scopeBuf=[]; const SCN=120;
+function scopePush(E){ scopeBuf.push(E); if(scopeBuf.length>SCN)scopeBuf.shift();
+  let mx=1e-9; for(const v of scopeBuf)mx=Math.max(mx,Math.abs(v));
+  $('#scope-trace').setAttribute('points', scopeBuf.map((v,i)=>`${(i/(SCN-1)*230).toFixed(1)},${(35-v/mx*26).toFixed(1)}`).join(' '));
+}
+function scopeClear(){ scopeBuf.length=0; $('#scope-trace').setAttribute('points',''); }
+
+// ===== markers (emitted photon) — kept so emission is visible, sped 5x toward c =====
+let markers=[];
+function spawnPhotonMarker(){
+  const s=5.0;  // 5x speed-up so the emitted photon is visibly fast
+  markers.push({pos:[2,1,2],vel:[14*s,9*s,14*s],col:[0.62,0.42,0.95],born:performance.now()}); needsDraw=true; }
+function stepMarkers(dt){ markers.forEach(m=>{m.pos[0]+=m.vel[0]*dt;m.pos[1]+=m.vel[1]*dt;m.pos[2]+=m.vel[2]*dt;});
+  markers=markers.filter(m=>Math.hypot(...m.pos)<SIM.rmax*1.6); }
+
+// ===== beat state machine =====
+let bi=-1, animating=false, activeHolds=null, paused=false, atHold=false;
+let render={expo:1.2,dec:5.0};
+let pointAnchor=null;
+function $beat(){return BEATS[bi];}
+
+async function gotoBeat(idx, fromBack){
+  idx=Math.max(0,Math.min(BEATS.length-1,idx));
+  const fade=$('#fade'); fade.classList.add('show');
+  await wait(220);
+  const prevBi=bi; bi=idx; const B=BEATS[bi];
+  animating=false; activeHolds=null; paused=false; atHold=false; markers=[]; pointAnchor=null; needsDraw=true;
+  $('#paused').classList.remove('show'); clearPoint(); $('#prog').style.width='0%'; $('#throttle').classList.remove('show');
+  $('#sandbox').classList.remove('show'); $('#stage').classList.remove('docmode');
+  if(worker) worker.postMessage({type:'stop'});
+
+  // --- documentation page: hide the viewport entirely, show prose ---
+  if(B.doc){
+    $('#stage').classList.add('docmode'); $('#doc').scrollTop=0; hideClock();
+    paintCard(B); paintDots(); updateNav();
+    fade.classList.remove('show'); runState='done'; return;
+  }
+
+  if(B.cfg){ await workerConfig(B.cfg); }
+  // continuous flow: continue from the previous beat's wavefunction when stepping forward
+  // through a chained beat; otherwise re-initialise this beat cleanly.
+  const cont = !fromBack && B.continueFrom && (idx===prevBi+1);
+  if(!cont && B.inState){ worker.postMessage({type:'setState',cfg:B.cfg,state:B.inState}); }
+
+  // camera: ONE default orientation, free orbit, no scripted angles, no idle spin.
+  // Only the framing distance tracks the box size so each phase is sized sensibly.
+  cam.distTarget = (B.dist||2.0)*B.cfg.rmax;
+  render.expo=B.expo; render.dec=B.dec;
+
+  paintCard(B); paintDots(); updateNav();
+  $('#scope').style.opacity = (B.scope)?1:0.0;
+  if(B.clock) resetClock(); else hideClock();
+  if(B.point && !B.trigger) pointAnchor=B.point;   // static label on non-animated beats
+  if(B.sandbox){ $('#sandbox').classList.add('show'); refreshSB(); }
+  fade.classList.remove('show');
+  runState=fromBack?'done':'idle';
+}
+
+function paintCard(B){ $('#eyebrow').textContent=B.ph||''; $('#title').innerHTML=B.title; $('#body').innerHTML=B.body||''; }
+function paintDots(){ const d=$('#dots'); if(d.children.length!==BEATS.length){ d.innerHTML=''; BEATS.forEach((_,i)=>{const e=document.createElement('div');e.className='dot';e.onclick=()=>gotoBeat(i);d.appendChild(e);});}
+  [...d.children].forEach((e,i)=>e.className='dot'+(i===bi?' active':(i<bi?' done':''))); 
+  $('#cn-cur').textContent=String(bi+1).padStart(2,'0'); $('#cn-tot').textContent=String(BEATS.length).padStart(2,'0'); }
+function updateNav(){ $('#prev').disabled=(bi===0); $('#next').textContent=(bi===BEATS.length-1)?'restart ↺':'next →'; }
+
+// ---- the Next button: resume-from-pause | snap | trigger | advance ----
+function onNext(){
+  const B=$beat();
+  if(atHold){ resumeFromHold(); return; }                // 0) frozen at a hold -> resume same sim
+  if(animating){ /* let it run; snap = jump to its settled end by stopping early */ snapToEnd(); return; }
+  if(B.trigger && runState!=='played'){ fireTrigger(B); return; }   // fire the pulse/decay
+  if(bi>=BEATS.length-1){ gotoBeat(0); return; }
+  gotoBeat(bi+1);
+}
+function onPrev(){ if(bi>0) gotoBeat(bi-1,true); }
+
+function fireTrigger(B){
+  const tr=B.trigger;
+  animating=true; runState='running'; scopeClear(); needsDraw=true; $('#throttle').classList.remove('show'); if(B.clock) resetClock();
+  activeHolds = tr.holds ? tr.holds.map(h=>({...h,done:false})) : null;
+  worker.postMessage({type:'run', cfg:B.cfg, dt:B.cfg.dt, ...tr.run});
+}
+function checkHolds(frac){
+  if(!activeHolds||atHold) return;
+  for(const h of activeHolds){ if(!h.done && frac>=h.atFrac){ h.done=true; freezeAtHold(h); return; } }
+}
+function freezeAtHold(h){                 // TRUE pause: freeze the integrator on a real frame
+  worker.postMessage({type:'pause'});
+  atHold=true; pointAnchor=h.point||null; $('#paused').classList.add('show');
+}
+function resumeFromHold(){                 // resume the very same simulation
+  atHold=false; clearPoint(); $('#paused').classList.remove('show');
+  worker.postMessage({type:'resume'});
+}
+function snapToEnd(){
+  // skip to the settled end: stop the worker and mark played (next advances).
+  worker.postMessage({type:'stop'});
+  animating=false; atHold=false; runState='played'; $('#paused').classList.remove('show'); clearPoint();
+}
+function onRunDone(){
+  animating=false; atHold=false; runState='played';
+  if($beat().point) pointAnchor=$beat().point;
+  $('#paused').classList.add('show');
+}
+
+addEventListener('keydown',e=>{ if(e.key==='ArrowRight'||e.key===' ') {e.preventDefault();onNext();} else if(e.key==='ArrowLeft') onPrev(); });
+$('#next').onclick=onNext; $('#prev').onclick=onPrev;
+
+// ===== clock =====
+let clockOn=false, clockT0=0;
+function resetClock(){clockOn=true;clockT0=performance.now();$('#clock').style.opacity=1;}
+function hideClock(){clockOn=false;$('#clock').style.opacity=0;}
+function tickClock(){ if(!clockOn||!latestFrame)return;
+  const fs=latestFrame.simT*AU_FS; $('#clock-v').textContent= fs<1?(fs*1000).toFixed(0)+' as':fs.toFixed(2)+' fs'; }
+
+// ===== label projection (3D anchor -> screen) =====
+function projectPoint(at, camPos,fwd,rgt,up,W,H){
+  const rel=[at[0]-camPos[0],at[1]-camPos[1],at[2]-camPos[2]];
+  const depth=rel[0]*fwd[0]+rel[1]*fwd[1]+rel[2]*fwd[2];
+  if(depth<=0.1) return null;
+  const tanf=Math.tan(0.5*48*Math.PI/180), aspect=W/H;
+  const sx=(rel[0]*rgt[0]+rel[1]*rgt[1]+rel[2]*rgt[2])/(depth*tanf*aspect);
+  const sy=(rel[0]*up[0]+rel[1]*up[1]+rel[2]*up[2])/(depth*tanf);
+  return [ (sx*0.5+0.5)*W, (1-(sy*0.5+0.5))*H ];
+}
+function clearPoint(){ const c=$('#callout'); c.style.opacity=0; }
+
+// ===== orientation gizmo: symmetry axis (amber), world-up, faint world frame, equatorial ring =====
+function vscale(v,s){return [v[0]*s,v[1]*s,v[2]*s];}
+function drawAxes(camPos,fwd,rgt,up){
+  const svg=$('#axes'); if(!svg) return;
+  const W=innerWidth,H=innerHeight, R=SIM.rmax;
+  const P=(at)=>projectPoint(at,camPos,fwd,rgt,up,W,H);
+  let s='';
+  const line=(a,b,col,w,dash)=>{ const pa=P(a),pb=P(b); if(!pa||!pb) return;
+    s+=`<line x1="${pa[0].toFixed(1)}" y1="${pa[1].toFixed(1)}" x2="${pb[0].toFixed(1)}" y2="${pb[1].toFixed(1)}" stroke="${col}" stroke-width="${w}" ${dash?`stroke-dasharray="${dash}"`:''} opacity="0.9"/>`; };
+  // faint world frame (Y = up, Z) — gives "where up is"
+  line([0,0,0],[0,R*0.5,0], '#3a6b4a', 1.0, '');           // +Y up (green)
+  line([0,0,0],[0,0,R*0.5], '#39507a', 1.0, '4 4');         // +Z (blue, dashed)
+  // symmetry / E-field axis (X) — the physically meaningful one, amber, full length
+  line(vscale(AXIS,-R*0.85), vscale(AXIS,R*0.85), '#f0a830', 1.4, '');
+  // equatorial ring: circle radius 0.72R in plane ⊥ AXIS (the Y–Z plane since AXIS=X)
+  const pts=[]; const rr=R*0.72;
+  for(let i=0;i<=64;i++){ const a=i/64*2*Math.PI; const pt=P([0, rr*Math.cos(a), rr*Math.sin(a)]);
+    if(pt) pts.push(`${pt[0].toFixed(1)},${pt[1].toFixed(1)}`); }
+  if(pts.length>2) s+=`<polyline points="${pts.join(' ')}" fill="none" stroke="#2a2735" stroke-width="1"/>`;
+  // labels
+  const lab=(at,txt,col)=>{ const p=P(at); if(!p) return;
+    s+=`<text x="${(p[0]+6).toFixed(1)}" y="${(p[1]-4).toFixed(1)}" fill="${col}" font-family="JetBrains Mono,monospace" font-size="10" opacity="0.85">${txt}</text>`; };
+  lab(vscale(AXIS,R*0.85),'E-field / symmetry axis','#f0a830');
+  lab([0,R*0.5,0],'up','#5a8b6a');
+  svg.innerHTML=s;
+}
+function drawPoint(camPos,fwd,rgt,up){
+  const c=$('#callout');
+  if(!pointAnchor){ c.style.opacity=0; return; }
+  const worldAt = (pointAnchor.axisAt!==undefined) ? vscale(AXIS,pointAnchor.axisAt) : pointAnchor.at;
+  const sp=projectPoint(worldAt,camPos,fwd,rgt,up,innerWidth,innerHeight);
+  if(!sp){ c.style.opacity=0; return; }
+  const lx=sp[0]+70, ly=sp[1]-44;
+  c.querySelector('svg').innerHTML=`<line x1="${sp[0]}" y1="${sp[1]}" x2="${lx}" y2="${ly}" stroke="#6c6578" stroke-width="1" stroke-dasharray="3 3"/><circle cx="${sp[0]}" cy="${sp[1]}" r="3.5" fill="none" stroke="#e64097"/>`;
+  const lab=c.querySelector('.lab'); lab.className='lab '+(pointAnchor.cls||''); lab.textContent=pointAnchor.txt;
+  lab.style.left=lx+'px'; lab.style.top=ly+'px';
+  c.style.opacity=1;
+}
+
+// ===== sandbox =====
+function sbI(){ const v=+$('#sb-i').value/100; return 3e12*Math.pow(2e14/3e12, v); }
+function sbW(){ return 45.5634/(+$('#sb-w').value); }   // a.u. angular freq from wavelength (nm)
+function refreshSB(){
+  const I=sbI(); $('#sb-i-v').textContent=I.toExponential(1);
+  $('#sb-w-v').textContent=(+$('#sb-w').value)+' nm';
+  const w=sbW(); const E0=Math.sqrt(I/3.51e16), Up=E0*E0/(4*w*w), g=Math.sqrt((SIM.Ip/27.2114)/(2*Up));
+  $('#sb-g-v').textContent=g.toFixed(2); $('#sb-g-v').style.color=g<1?'#22b5b9':'#e64097';
+}
+function bindSandbox(){
+  $('#sb-i').addEventListener('input',refreshSB);
+  $('#sb-w').addEventListener('input',refreshSB);
+  $('#sb-run').onclick=()=>{ animating=true; runState='running'; scopeClear(); needsDraw=true;
+    const w=sbW(), steps=Math.round(1.7*2*2*Math.PI/w/ION.dt);
+    worker.postMessage({type:'run',cfg:ION,dt:ION.dt,start:'1s',
+      field:{type:'strong',ncyc:2,I:sbI(),w}, steps, secs:7}); };
+}
+
+// ===== readout =====
+function paintReadout(){
+  const f=latestFrame, B=$beat(); if(!B) return;
+  let cap='binding energy', big=SIM.Ip.toFixed(2)+' eV';
+  if(B.keReadout){ cap='photoelectron KE'; const ke=(B.keReadout*27.2114 - SIM.Ip);
+      big=ke.toFixed(1)+' eV'; }
+  else if(B.ejReadout){ cap='ejected'; big=f?(Math.max(0,f.obs.ejected)*100).toFixed(1)+'%':'0.0%'; }
+  else if(B.emitOnRun){ cap='photon emitted'; big=(SIM.gap?SIM.gap.toFixed(1):'10.0')+' eV'; }
+  else if(B.cfg===ION){ cap='ionised fraction'; big=f?(f.obs.ion*100).toFixed(1)+'%':'0.0%'; }
+  else if(f && f.obs.P3d>0.15){ cap='in 3d / 2p'; big=(f.obs.P3d*100).toFixed(0)+' / '+(f.obs.P2p*100).toFixed(0)+'%'; }
+  else if(f && f.obs.P2p>0.2){ cap='in 2p (excited)'; big=(f.obs.P2p*100).toFixed(0)+'%'; }
+  $('#ro-cap').textContent=cap; $('#ro-big').textContent=big;
+  const rows=$('#readout').querySelector('.ro-rows');
+  const show = f && (f.obs.P2p>0.01 || f.obs.P3d>0.01 || f.obs.ejected>0.01);
+  rows.style.opacity = show ? '1' : '0';
+  if(f){ $('#ro-ion').textContent=(Math.max(0,f.obs.ejected)*100).toFixed(1)+'%';
+    $('#ro-p2').textContent=(f.obs.P2p*100).toFixed(0)+'%';
+    $('#ro-p3').textContent=(f.obs.P3d*100).toFixed(0)+'%'; }
+}
+
+// ===== render loop =====
+const AXIS=[1,0,0];   // symmetry axis HORIZONTAL (world-X), perpendicular to the world-Y orbit axis:
+                       // left-right drag sweeps the full pole<->side range (max view variation)
+function loop(t){
+  cam.dist+=(cam.distTarget-cam.dist)*0.08;
+  const B=$beat();
+  if(B && B.doc){ requestAnimationFrame(loop); return; }   // documentation page: nothing to raymarch
+  // render-on-demand: only do the expensive raymarch when the image could have changed —
+  // a streaming frame, a moving/easing camera, a flying photon, or a freshly-entered beat.
+  // When the viewer is just reading a static frame, the GPU idles (much lower power/fans).
+  if((animating && !atHold) || Math.abs(cam.dist-cam.distTarget)>0.4 || markers.length || drag) needsDraw=true;
+  if(!needsDraw){ requestAnimationFrame(loop); return; }
+  needsDraw=false;
+
+  // no idle auto-rotation: the view only moves when the user drags.
+  const cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch),cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw);
+  const camPos=[cam.dist*cp*sy, cam.dist*sp, cam.dist*cp*cy];
+  const fwd=norm3([-camPos[0],-camPos[1],-camPos[2]]);
+  const rgt=norm3(cross(fwd,[0,1,0])); const up=cross(rgt,fwd);
+
+  const canvas=$('#gl'); const dpr=Math.min(devicePixelRatio||1,1.3);
+  const W=Math.floor(innerWidth*dpr),H=Math.floor(innerHeight*dpr);
+  if(canvas.width!==W){canvas.width=W;canvas.height=H;} gl.viewport(0,0,W,H);
+
+  if(latestFrame) uploadChannels(latestFrame.re,latestFrame.im,SIM.Nr,SIM.L);
+  stepMarkers(0.016);
+
+  gl.useProgram(prog);
+  gl.uniform2f(U.uRes,W,H);
+  gl.uniform3fv(U.uCamPos,camPos); gl.uniform3fv(U.uCamRight,rgt); gl.uniform3fv(U.uCamUp,up); gl.uniform3fv(U.uCamFwd,fwd);
+  gl.uniform1f(U.uTanFov,Math.tan(0.5*48*Math.PI/180));
+  gl.uniform1f(U.uRmax,SIM.rmax); gl.uniform1f(U.uDr,SIM.dr);
+  gl.uniform1i(U.uNr,SIM.Nr); gl.uniform1i(U.uL,SIM.L); gl.uniform1i(U.uSteps,168);
+  gl.uniform1f(U.uPeak, latestFrame?Math.max(latestFrame.obs.peak,1e-9):0.1);
+  gl.uniform1f(U.uDecades,render.dec); gl.uniform1f(U.uExposure,render.expo);
+  gl.uniform1f(U.uDimR0,0.0); gl.uniform1f(U.uDimR1,1e9); gl.uniform1f(U.uDimFactor,1.0);  // dimming removed (no-op)
+  gl.uniform3fv(U.uAxis,AXIS);
+  const mp=new Float32Array(18),mc=new Float32Array(18); const mk=markers.slice(-6);
+  mk.forEach((m,i)=>{mp.set(m.pos,i*3);mc.set(m.col,i*3);});
+  gl.uniform1i(U.uNMark,mk.length); gl.uniform3fv(U.uMarkPos,mp); gl.uniform3fv(U.uMarkCol,mc);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,chanTex); gl.uniform1i(U.uChan,0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,turboTex); gl.uniform1i(U.uTurbo,1);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+
+  drawPoint(camPos,fwd,rgt,up);
+  drawAxes(camPos,fwd,rgt,up);
+  paintReadout(); tickClock();
+  requestAnimationFrame(loop);
+}
+
+// ===== boot =====
+function showErr(m){ $('#err').classList.add('show'); $('#err-msg').textContent=m; }
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function boot(){
+  try{
+    initGL($('#gl')); bindCanvas($('#gl')); bindSandbox();
+    spawnWorker();
+    await workerConfig(LINE);     // warm up
+    $('#begin').disabled=false; $('#begin').textContent='begin →'; $('#warmup').style.opacity=0;
+    requestAnimationFrame(loop);
+  }catch(e){ showErr(String(e.message||e)); }
+}
+$('#begin').onclick=async()=>{ $('#intro').style.transition='opacity .6s'; $('#intro').style.opacity=0;
+  await wait(600); $('#intro').style.display='none'; gotoBeat(0); };
+$('#begin').disabled=true; $('#warmup').style.opacity=1;
+boot();
+</script>
+</body></html>
