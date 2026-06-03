@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
-<title>The Atom Itself · live TDSE · C6</title>
+<title>Photon // C6 Aerospace</title>
 <meta name="description" content="A hydrogen atom solving the Schrödinger equation live in your browser: orbitals, line spectra, and the photoelectric effect — computed, not animated."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
@@ -103,46 +103,52 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:0;border-radiu
         </div>
       </div>
       <div id="sandbox">
-        <div><div class="sl-lab"><span>intensity</span><span class="v" id="sb-i-v">2.0e14</span></div><input id="sb-i" type="range" min="0" max="100" value="72"/></div>
-        <div><div class="sl-lab"><span>wavelength</span><span class="v" id="sb-w-v">800 nm</span></div><input id="sb-w" type="range" min="250" max="800" value="800" step="10"/></div>
-        <div><div class="sl-lab"><span>Keldysh γ</span><span class="v" id="sb-g-v">0.75</span></div></div>
+        <div><div class="sl-lab"><span>intensity</span><span class="v" id="sb-i-v">2.4e13</span></div><input id="sb-i" type="range" min="0" max="100" value="50"/></div>
+        <div><div class="sl-lab"><span>wavelength</span><span class="v" id="sb-w-v">90 nm</span></div><input id="sb-w" type="range" min="50" max="250" value="90" step="20"/></div>
         <button class="btn primary" id="sb-run" style="width:100%">▶ fire pulse</button>
       </div>
       <div id="nav"><button class="btn" id="prev">← back</button><div id="dots"></div><button class="btn primary" id="next">next →</button></div>
     </div>
     <div id="doc"><div class="wrap">
       <div class="sub">a technical note</div>
-      <h2>How this was made</h2>
-      <p>I built this to solve one atom and then show its insides without lying about any of them. It's a live solution of the time-dependent Schrödinger equation for a single electron bound to a proton — hydrogen, the one atom that can be solved exactly. The obstacle is size: the full wavefunction lives on a three-dimensional grid of hundreds of millions of points, far too many to step frame by frame in a browser. Symmetry is the way out. Because the driving light points along one axis, the wavefunction splits <em>exactly</em> into a small set of angular pieces — spherical-harmonic channels — each collapsed to a function of radius alone. I march those channels forward together with a split-operator Crank–Nicolson scheme in atomic units, on a background thread, and the GPU rebuilds <b>|&#968;|&#178;</b> and ray-marches it into the cloud you see.</p>
+      <h2>How this works</h2>
+      <p>The application solves the time-dependent Schrödinger equation for a single electron bound to a proton — hydrogen — and renders the evolving probability density in real time inside a web browser. Hydrogen is the only atom whose electronic structure is exactly solvable, which makes it possible to drive the dynamics directly from the equation rather than from precomputed or tabulated data. The entire system — numerical integrator, concurrency layer, and volumetric renderer — is contained in a single HTML file with no external dependencies or build step. The only hard runtime requirement is a WebGL2 context with floating-point textures.</p>
+      <p>The central engineering problem is dimensionality. The full wavefunction is a complex field over three spatial dimensions; resolved finely enough to capture both the dense core and a departing electron, it occupies on the order of hundreds of millions of grid points, far beyond what can be stepped frame by frame in a browser. The system avoids this cost through an exact symmetry reduction rather than a coarser grid.</p>
 
-      <h3>why the channel trick works</h3>
-      <p>For a field along a single axis the split is exact, not an approximation — it just re-expresses the same wavefunction in a far cheaper basis. The only cost is how many channels you keep, which trades accuracy for speed. The gentle climb up the energy ladder needs seven; single-photon ionisation, where the freed electron leaves as a near-pure p-wave, needs five; the violent infrared case needs about thirty-three, because the field drives the electron back through the core and it reaches high angular momentum on the way. The one thing this basis cannot represent is light arriving from more than one direction at once — so the field always points one way.</p>
+      <h3>reduction to coupled radial channels</h3>
+      <p>All driving fields in the simulation are linearly polarised along a single fixed axis. For a field along one axis, the magnetic quantum number m is conserved and remains zero throughout, so the wavefunction can be expanded in spherical-harmonic partial waves of the form ψ(r, θ) = Σ<sub>l</sub> [u<sub>l</sub>(r) / r] Y<sub>l0</sub>(θ). This is an exact re-expression of the same wavefunction in a cheaper basis, not an approximation; the only quantity that approximates anything is the number of angular channels retained. The three-dimensional problem collapses to a set of coupled one-dimensional radial functions u<sub>l</sub>(r), one per angular momentum l from 0 to a chosen maximum. The single physical situation this basis cannot represent is light arriving from more than one direction at once, which is why the polarisation axis is always fixed.</p>
 
-      <h3>drawing the cloud</h3>
-      <p>Each pixel sends a ray through the volume, rebuilds the density from the channels along it, and keeps the single brightest point it crosses. The density spans many orders of magnitude between the dense core and the faint outgoing wave, so I map brightness logarithmically and rescale every frame to the densest point present — which is why a thinning cloud appears to brighten as the core drains away. The clock is tied to wall-time, not to how fast the machine can compute: every step takes the same number of seconds everywhere, and hardware that can't keep up is slowed and told so, rather than left to stutter.</p>
+      <h3>spatial discretisation and the Hamiltonian</h3>
+      <p>Each radial channel is discretised on a uniform grid r<sub>i</sub> = (i + 1)·dr for i = 0 … Nr − 1, with dr = rmax / Nr. The grid deliberately begins at dr rather than the origin, which keeps the Coulomb singularity off the mesh and enforces the correct u(0) = 0 boundary implicitly.</p>
+      <p>Within a channel the radial Hamiltonian is tridiagonal. The diagonal carries the kinetic term, the centrifugal barrier, and the Coulomb potential, 1/dr<sup>2</sup> + l(l+1)/(2r<sup>2</sup>) − 1/r; the off-diagonals carry the three-point finite-difference kinetic coupling, −1/(2dr<sup>2</sup>). The external field enters in the length gauge as an interaction proportional to r·E(t)·cosθ, which couples each channel only to its immediate neighbours l ± 1. The angular coupling coefficient is the standard matrix element l / √((2l−1)(2l+1)). All quantities are expressed in Hartree atomic units; conversions to electronvolts (×27.2114) and femtoseconds (×0.0242) are applied only at the reporting boundary.</p>
 
-      <h3>what's real, and what's simplified</h3>
-      <p>The electron and its equation are real. Every shape, node, fringe and threshold you see is emergent — none of it is drawn or scripted. Three things are simplified on purpose, and the line I held is this: simplify the <em>inputs</em>, never the <em>outputs</em>. The proton is held fixed, which is honest — it outweighs the electron about two thousand to one and barely moves. The light is a classical oscillating field rather than counted photons; the energy crossing in and out is exact, but a single photon is never resolved as a quantum. And the lone photon that flies off when the atom falls is the one openly scripted thing on screen. A real one would leave at the speed of light — about 137 in these atomic units, two orders of magnitude faster than the electron's own motion — and you would never catch it. This marker crawls far below that, only so it is slow enough to watch; it marks that a quantum of light has left, not how fast it went. A soft absorbing edge at the boundary quietly removes any electron that reaches it, standing in for a detector placed far away.</p>
+      <h3>time propagation</h3>
+      <p>The state is advanced by a symmetric Strang split-operator scheme. A single step factorises the evolution into a half-step of the radial Hamiltonian, a full step of the angular field coupling, and a second half-step of the radial Hamiltonian. Each of the three factors is applied with a Crank–Nicolson (Cayley) propagator of the form (1 − iA·Δ/2)·ψ<sub>new</sub> = (1 + iA·Δ/2)·ψ<sub>old</sub>. This propagator is implicit, unconditionally stable, and exactly unitary in exact arithmetic, so probability is conserved to machine precision regardless of step size, and the overall split is second-order accurate in time.</p>
+      <p>The scheme is efficient because both Crank–Nicolson solves reduce to tridiagonal linear systems. The radial factor is tridiagonal along the radial index and is solved independently for each channel; the coupling factor is tridiagonal along the angular index l and is solved independently at each radial point. Both are dispatched through one complex tridiagonal (Thomas) solver, reused without modification across the radial sweep of length Nr, the angular sweep of length L, and the eigenstate relaxation described below. After the three factors, an absorbing mask is applied, completing the step.</p>
 
-      <h3>what was easy, and what was hard</h3>
-      <p>Every line of this came from me, written to direction in one sitting of about seven hours; none of it was typed by hand. That makes the usual measure of difficulty meaningless — no long nights chasing a bug, only rounds of conversation, and the record of what was hard is simply how many rounds each thing took. The split surprised me. The quantum mechanics, the part that sounds hard, was the easy part. Seeing it was the hard part.</p>
-      <p>The solver came together fast. A coupled-channel split-operator integrator is well-trodden ground, and it matched an independent reference almost at once: the right energy levels, the right orbital shapes, the driven transitions moving exactly the population they should. The violent regime checked out too — pushed hard, the atom radiates a comb of high harmonics, and only the odd ones survive, exactly as the inversion symmetry demands. Nothing imposed that; it fell out of the equation. Long before any real-time rendering existed, a handful of flat 2-D plots had already settled that the physics was sound.</p>
-      <figure><img src="img/tdse_validation.png" alt="strong-field wavefunction snapshots and HHG spectrum validated against a reference solver" loading="lazy"/><figcaption>The hardest case, validated first: strong-field snapshots — a sliver tunnelling out near the field peak, then a structured continuum streaming away — beside the high-harmonic spectrum. The odd-only lines are the symmetry showing itself, not something I put in; all of it was checked against a separate solver before any live graphics existed.</figcaption></figure>
-      <p>Showing it was the fight. The same dynamic range that makes the physics rich makes it almost impossible to expose: no single brightness window holds both the dense core and the faint outgoing wave — too tight and the outer structure vanishes, too wide and everything floods to a flat glow. Worse, the 3-D volume that looks so good here actively buries detail a flat slice shows at a glance. I spent round after round ruling out the channel count and the pacing optimisations before pinning the real culprit: the brightness window itself.</p>
-      <figure><img src="img/diag_preview.png" alt="2-D slice compared against volume renders at several brightness windows and step counts" loading="lazy"/><figcaption>Isolating the exposure. A flat 2-D slice against the volume render at several brightness windows and step counts — proof that the projection and the optimisations weren't eating the structure. Widening the window alone brought it back.</figcaption></figure>
-      <p>The colour map was the same fight in miniature. The original teal-and-cerise was on-brand and looked the part, but it couldn't carry the structure the physics needed to show. Moving to a perceptually-ordered map was the moment the nodes, the interference fringes and the outgoing lobes became legible instead of merely implied.</p>
-      <figure><img src="img/diag_colors.png" alt="the same wavefunction rendered in four perceptual colour maps" loading="lazy"/><figcaption>Choosing a colour map by what it reveals, not what it matches. Four perceptual maps against the same instant; the structure was always in the data — the brand palette had simply been hiding it.</figcaption></figure>
-      <p>The small things were stubbornly hard too. An orbital is so nearly symmetric that a viewer loses all sense of up, down, or which way the light is pushing — so I designed in a small orientation gizmo and one fixed, labelled axis, purely so the space reads at a glance. And every beat is tuned as teaching, not as physics: the first climb is calibrated to land almost perfectly in a single clean state, because the whole point of that moment is how sharp a pure state looks against the mess that follows.</p>
-      <p>The writing took more passes than the physics, and it's worth saying why, since written explanation is where work like this most visibly fails. The failures are specific. It teaches in the order things were discovered instead of the order they're understood — archaeology, when the reader came for science. It leaves derivation-traces: hedges and asides that answer some question from the conversation that no reader will ever ask. It blends registers, setting offhand shorthand beside finished prose. And because each edit patches one spot without re-reading the whole, the seams accrete into the disjointed, faintly uncanny voice people have learned to distrust on sight. None of that is hard to avoid once it's named; it's only hard to avoid by accident. The fix is dull — decide what the reader must understand, write to that and nothing else, and treat every pass as a rewrite of the whole rather than a repair of the last complaint. I held this page to it.</p>
+      <h3>initial states</h3>
+      <p>The states the simulation begins from and projects onto — 1s, 2p, and 3d — are not hard-coded shapes; they are computed numerically for each configuration by imaginary-time propagation. Replacing real time with imaginary time turns the unitary propagator into a contraction that drives any non-orthogonal seed toward the lowest eigenstate of a given angular channel. Seeding channel l with a profile of the form r<sup>p</sup>·e<sup>−r/(l+1)</sup> and iterating the same tridiagonal Cayley step in imaginary time converges to the desired bound state; the corresponding energy is then read off as the expectation value of the Hamiltonian. This relaxation runs once per configuration and is cached, so it does not affect the per-frame cost.</p>
 
-      <h3>the long un-faking</h3>
-      <p>None of what you walked through was the first plan. The first version barely simulated anything: the orbitals were closed-form shapes drawn directly, and the photoelectric "effect" was arithmetic dressed as animation — a glowing dot slid along a line, "hitting" the atom was a distance check, and the cloud faded to black to mean "ionised". The numbers obeyed Einstein's equation, but nothing evolved. The physics was asserted, then illustrated.</p>
-      <p>Replacing that with a real time-dependent solver changed what the piece could honestly claim, and walked straight into walls that looked fundamental. An excited atom seemingly couldn't be shown staying excited: staying put means shedding the energy gap as emitted light, and spontaneous emission is the one half of the light–matter exchange this model doesn't carry. And the fall back down, in an early cut, was a lie — the code overwrote the wavefunction with a perfect ground-state blob and played a photon leaving. That was a model-swap in the costume of physics, the exact cheat this whole thing exists to refuse.</p>
-      <p>Every wall gave way to the same move: simulate more. I tuned the driving pulse until the electron parks in the upper state on its own once the field switches off, so both the climb and the landing are real. I rebuilt the decay as the excited cloud actually draining back down — sloshing as a radiating dipole and settling into the ground state by itself. I left the unflattering cases in: the faint leak below the photoelectric threshold, where an electron now and then catches two photons at once, stayed rather than being tidied away, because the real effect is that bit messy and a too-clean simulation tells its own kind of lie.</p>
-      <p>One distinction sits under all of it. Simplifying the <em>inputs</em> is honest — a classical field instead of quantised light, a fixed proton, an absorbing wall for a far-off detector — because each is stated plainly and none of it changes how the wavefunction is computed. Faking the <em>outputs</em> is not — snapping to an ideal shape, scripting a particle's path, dissolving the cloud on cue — because that is a drawing of physics in physics' clothes. There is a blunter reason I prefer the real thing: I can't see the screen. A builder working by eye can stage an effect and trust that it looks right; I can't, so I leaned on the one thing that needs no eye to vouch for it — real physics draws itself. <em>Simulate more, fake less</em> began as a preference and ended as the rule the whole thing rests on. The single scripted element, the emitted photon, is labelled as exactly that. Nothing else is.</p>
+      <h3>boundary absorption</h3>
+      <p>A departing electron must be allowed to leave the grid without reflecting off its edge and contaminating the interior. Beyond a radius of 0.82·rmax, the wavefunction is multiplied each step by a smooth mask that ramps the amplitude toward zero at the outer boundary following a cos<sup>0.125</sup> profile. The gentle exponent suppresses reflection across a wide range of outgoing electron energies. Because absorbed amplitude is permanently removed, the loss of total norm provides a direct, physically meaningful measure of how much of the electron has been ionised and has reached the boundary.</p>
+
+      <h3>driving fields and resolution presets</h3>
+      <p>Every field is a finite pulse with a sin<sup>2</sup> envelope that ramps on, drives, and switches off, after which the field is identically zero and the populated state evolves freely. The integrator distinguishes four field constructions: a pulse tuned to an internal energy-level difference; a detuned variant offset from that difference by a fixed factor; a single-frequency ultraviolet pulse at an arbitrary frequency; and an intense infrared pulse (defaulting to 800 nm with a fixed carrier-envelope phase). Field strength is specified either directly or as an intensity in W/cm<sup>2</sup>, converted to atomic field amplitude by E0 = √(I / 3.51×10<sup>16</sup>).</p>
+      <p>Three parameter presets trade channel count and grid extent against speed, matched to the angular momentum each regime populates. Bound-state transitions use seven channels on a 130-unit grid; single-photon ionisation, where the freed electron leaves as a near-pure p-wave, uses five; the intense infrared regime uses thirty-three, because the field drives the electron back through the core and it acquires high angular momentum on the return. Grid spacing and time step are set per preset accordingly.</p>
+
+      <h3>spontaneous emission</h3>
+      <p>Spontaneous emission is not part of the bare Schrödinger evolution and is modelled phenomenologically. During the relevant sequence, excited amplitude — all channels with l ≥ 1, together with the excited l = 0 content — is drained by a small factor each step while the ground-state component is preserved, after which the state is renormalised. The retained ground-state-to-excited coherence produces a radiating-dipole oscillation as the excited population decays, and the cloud settles to the ground configuration without any discontinuity in the displayed state.</p>
+
+      <h3>execution model</h3>
+      <p>The integrator runs on a background Web Worker thread; the main thread is reserved for the user interface, camera, and rendering. Each computed frame is transferred to the main thread as a pair of floating-point arrays holding the real and imaginary parts of every channel, accompanied by a small set of scalar observables: total norm, ionised fraction, the population that has crossed a fixed escape radius, projections onto the 1s, 2p, and 3d eigenstates, and the peak density used for display scaling.</p>
+      <p>Pacing is deterministic and decoupled from hardware speed. Each scripted segment declares a wall-clock duration; the worker emits roughly sixty frames per second across that window by computing a fixed number of integration steps per frame, easing the frame spacing outward over the final stretch so the motion glides to a stop. If a single frame's computation exceeds its time budget for long enough, the worker slows the playback and signals that the hardware cannot keep up, rather than allowing the animation to stutter unpredictably.</p>
+
+      <h3>rendering</h3>
+      <p>The renderer is a WebGL2 fragment shader performing single-pass volumetric raymarching. The channel data arrives as an Nr × L two-channel floating-point texture holding the real and imaginary radial functions, re-uploaded each frame, alongside a 256-entry colour lookup table. A single full-screen triangle drives the shader.</p>
+      <p>For each pixel, a ray is cast from the camera and intersected analytically with the bounding sphere of radius rmax; the segment inside is marched at a fixed sample count. At every sample, the density is reconstructed on the fly: the polar angle is measured from the (tilted) symmetry axis, the partial-wave sum Σ<sub>l</sub> [u<sub>l</sub>(r)/r]·√((2l+1)/4π)·P<sub>l</sub>(cosθ) is evaluated by Legendre recurrence over the channels, and its squared modulus is taken. The shader keeps the single brightest sample along each ray, a maximum-intensity projection. Because the density spans many orders of magnitude between the core and a faint outgoing wave, brightness is mapped logarithmically across a fixed number of decades below the per-frame peak density, with a gamma adjustment, before the colour lookup and a final tone-mapping pass. Rescaling to the peak present in each frame is the reason a thinning cloud appears to brighten as its dense core drains away.</p>
       <p style="color:var(--dim);font-size:13px;margin-top:24px">— Claude Opus 4.8</p>
 
-      <p style="color:var(--faint);font-size:12px;margin-top:30px;letter-spacing:.04em">photon.c6.wiki · hydrogen, solved live · 29 / 5 / 2026</p>
+      <p style="color:var(--faint);font-size:12px;margin-top:30px;letter-spacing:.04em">photon.c6.wiki · C6 Aerospace // 29/05/2026</p>
     </div></div>
   </div>
   <div id="prog"></div>
@@ -150,9 +156,9 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:0;border-radiu
   <div id="throttle">⚠ throttling simulation speed — hardware seems to be struggling</div>
   <div id="fade"></div>
   <div id="intro">
-    <div class="mono">C6 · computational physics</div>
-    <h1>This is a hydrogen atom.<br/>Your computer is about to<br/><em>solve it from scratch.</em></h1>
-    <p>Nothing here is filmed or pre-animated. The Schrödinger equation is solved live, and what you watch is the electron's wavefunction itself — its shape, the light it absorbs and gives back, the moment it breaks free. Computed on this machine, right now.</p>
+    <div class="mono">C6 Aerospace // Computational Physics</div>
+    <h1>Your computer is about to<br/><em>solve the Schrödinger equation</em>.</h1>
+    <p>Nothing here is pre-computed. This is an actual simulation of a hydrogen atom's wavefunction in real-time. This demonstration will use it to explain the particle nature of light.</p>
     <button class="btn primary" id="begin">begin →</button>
     <div class="mono" id="warmup" style="opacity:0">warming up the solver…</div>
   </div>
@@ -529,76 +535,74 @@ function camP(yaw,pitch,distFrac){return{yaw,pitch,distFrac};}
 const BEATS=[
 // ===================== PHASE I — the atom =====================
 { ph:'I · the atom', title:'A single electron',
-  body:`There's one electron here, bound to a proton at the centre. It isn't a dot tracing an orbit — quantum mechanics says it has no single position at all. What glows is probability: the cloud is brightest where you'd be most likely to find the electron if you reached in and looked. Drag to look around.`,
+  body:`This is a hydrogen atom: one electron bound to a proton at the centre. The electron is not a dot on an orbit like what you learn at A-level — quantum mechanics says it has no single position at all, only a probability of being found in each place, and that is what the cloud shows. The colour shows how likely the electron is to be found at each point.`,
   cfg:LINE, inState:'1s', dist:2.0, expo:1.2, dec:5.0 },
 
 { ph:'I · the atom', title:`Where's the <em>proton?</em>`,
-  body:`Right at the centre — but a proton is about a hundred thousand times smaller than this cloud, far too small to draw. So only the electron is shown; the proton is just the inward pull that holds it here. The bright core isn't the proton, it's where the electron crowds in closest.`,
-  cfg:LINE, inState:'1s', dist:1.6, expo:1.2, dec:5.0,
-  point:{axisAt:0,txt:'electron most likely here',cls:''} },
+  body:`At the centre, but far too small to see — a proton is about a hundred thousand times smaller than this cloud. The dense core is not the proton; it is where the electron's probability is densest.`,
+  cfg:LINE, inState:'1s', dist:1.6, expo:1.2, dec:5.0 },
 
 { ph:'I · the atom', title:'A <em>standing wave</em>',
-  body:`Left alone, this shape never changes. It's a standing wave — like the fundamental note on a plucked string, but wrapped around the nucleus in three dimensions. Because nothing about it moves in time, it gives off no light at all: a hydrogen atom in the dark stays dark. It's the lowest of a whole ladder of allowed shapes, and to climb it we'll use light.`,
+  body:`Left alone, the shape of this cloud never changes: it is a standing wave — the same kind of pattern as the fundamental on a plucked string. Because the electron has a wavelength of its own — its de Broglie wavelength — only certain wavelengths form a standing wave around the proton, just as a string fixed at both ends only supports certain wavelengths (λₙ = 2L/n). This shape is the lowest, and represents the lowest energy level. We can excite the electron to a higher energy level with a photon.`,
   cfg:LINE, inState:'1s', dist:2.0, expo:1.2, dec:5.0 },
 
-// ===================== PHASE II — climbing with light =====================
-{ ph:'II · climbing with light', title:'Tune the light, <em>climb a rung</em>',
-  body:`Each rung of the ladder sits at one exact energy above the last. Drive the atom with light tuned to precisely that gap and the electron soaks it up, swelling into a new shape. Anything off that pitch does nothing — we'll see why shortly. Press next to fire the pulse and watch it climb.`,
+// ===================== PHASE II — line spectra =====================
+{ ph:'II · line spectra', title:'Absorbing a <em>photon</em>',
+  body:`Quantum mechanics says electromagnetic waves are quantised — split into discrete quanta of light called photons, rather than a continuous wave. The energy of a photon is E = hf, where h is Planck's constant and f is the frequency, so higher-frequency light carries more energy per photon. If a photon's energy equals the difference in energy between two of the electron's energy levels, the electron absorbs it and becomes excited, moving to the higher energy level.`,
   cfg:LINE, inState:'1s', dist:2.1, expo:1.2, dec:5.0, clock:true, scope:true,
   trigger:{ run:{ field:{type:'pulse',transition:'1s2p',E0:0.04,Tp:180}, steps:5200, secs:5.5 } } },
 
-{ ph:'II · climbing with light', title:'The <em>2p</em> orbital',
-  body:`The next rung up: two lobes split by a flat plane the electron simply never crosses. That gap is a node — the very same dead-still point you'd find at the middle of a vibrating string, now spread into a whole plane. This is one clean standing wave, which is exactly why it holds its shape so sharply. Hold that image of how crisp it is.`,
-  cfg:LINE, continueFrom:true, inState:'2p', dist:2.0, expo:1.15, dec:5.0,
-  point:{axisAt:9,txt:'a node — never found here',cls:'ice'} },
+{ ph:'II · line spectra', title:'What an <em>energy level</em> is',
+  body:`The electron is now in a different standing wave — and this is what an energy level really is. Only certain standing waves are stable around the proton, and each one has a single, definite energy; because there is no stable shape between them, there is no allowed energy between them either. That is why the levels are discrete. This shape has two lobes, separated by a flat plane the electron is never found in — a node, the same as the still point at the centre of a vibrating string.`,
+  cfg:LINE, continueFrom:true, inState:'2p', dist:2.0, expo:1.15, dec:5.0 },
 
-{ ph:'II · climbing with light', title:'Higher up — and a <em>superposition</em>',
-  body:`Drive a second, smaller gap and the electron starts toward the next shape — but only partway, so it's left as a blend of two rungs at once. That blend is a superposition, and here you can actually watch it: the cloud sloshes back and forth as two standing waves of different energy beat against each other. A single rung would sit perfectly still; a mixture never can.`,
+{ ph:'II · line spectra', title:'A <em>superposition</em>',
+  body:`Tune to a smaller energy-level difference and stop partway through the jump: the electron is left in two levels at once, partly the lower and partly the higher. This is a superposition. You can see it directly — the cloud sloshes back and forth, because two standing waves of different energy are added together, and their differing frequencies make the combined shape rise and fall in time. A single energy level stays still; a superposition cannot.`,
   cfg:LINE, continueFrom:true, inState:'2p', dist:2.4, expo:1.25, dec:5.5, clock:true, scope:true,
   trigger:{ run:{ field:{type:'pulse',transition:'2p3d',E0:0.006,Tp:260}, steps:7000, secs:6.5 } } },
 
-{ ph:'II · climbing with light', title:'It falls, and a <em>colour comes out</em>',
-  body:`Nothing stays excited forever. The electron ripples back down to the lowest rung, and the energy it sheds leaves as a single photon — one fixed colour, set entirely by the size of the drop. Every hydrogen atom in the universe emits that identical colour on this fall; it's one of the bright lines you'd see if you split its light through a prism. Press next to let it drop.`,
+{ ph:'II · line spectra', title:'Emitting a <em>photon</em>',
+  body:`Nothing stays in a higher level for long. The electron moves back down to a lower one, and the energy it loses — exactly the gap between the two levels — leaves as a single photon, with its frequency fixed by that gap: ΔE = hf. So this transition produces one specific frequency, and that is one line of hydrogen's line spectrum. Every hydrogen atom emits the same set of frequencies, because every atom has the same fixed levels.`,
   cfg:LINE, continueFrom:true, inState:'2p', dist:2.2, expo:1.2, dec:5.0, clock:true, emitOnRun:true,
   trigger:{ run:{ field:{type:'none'}, decay:true, decayGamma:0.02, steps:6500, secs:6.5 } } },
 
-{ ph:'II · climbing with light', title:'The <em>wrong colour</em> does nothing',
-  body:`Back at the bottom, now lit with a colour that matches no gap on the ladder. The pushes drift out of step with the electron and cancel as often as they help, so energy never builds and nothing climbs — it just trembles in place. <span class="c">This</span> is why an atom only ever absorbs and emits particular colours: the light has to keep time with a jump that actually exists.`,
+{ ph:'II · line spectra', title:'The <em>wrong frequency</em> does nothing',
+  body:`Now a photon whose energy matches no energy-level difference at all. The cloud only trembles; the electron is not excited. Imagine pushing a swing at the wrong rhythm: your pushes fall out of step with the motion and cancel as often as they help, so nothing builds. <span class="c">A photon is absorbed only if the photon energy is equal to an energy-level difference.</span> An atom absorbs and emits only the frequencies on its line spectrum.`,
   cfg:LINE, inState:'1s', dist:2.0, expo:1.2, dec:5.0, clock:true, scope:true,
   trigger:{ run:{ field:{type:'offcolour',transition:'1s2p',E0:0.04,detune:1.7,Tp:200}, steps:5200, secs:5.5 } } },
 
-// ===================== PHASE III — breaking free =====================
-{ ph:'III · breaking free', title:'Knock it off <em>completely</em>',
-  body:`Lifting the electron one rung is one thing; tearing it off the atom entirely is another. That takes a photon carrying more energy than the binding energy holding it down — a threshold, exactly the role the work function plays in the photoelectric experiment. From here on, what matters about a colour is the energy each of its photons carries.`,
+// ===================== PHASE III — the photoelectric effect =====================
+{ ph:'III · the photoelectric effect', title:'<em>Ionisation</em>',
+  body:`Lifting the electron between levels is one thing; removing it from the atom entirely — ionising the atom — is another. The photoelectric effect works with metal plates on the same principle: a metal has a work function, the minimum energy needed to free an electron from its surface. This atom has a binding energy that plays exactly the same role, and we will call it the work function too, since that is the term the exam uses. Because each photon carries energy E = hf, a minimum energy to escape means a minimum frequency — the threshold frequency. A photon below the threshold frequency cannot free the electron; one at or above it can. From here, the only thing that matters about the light is the energy each photon carries.`,
   cfg:PHOTO, inState:'1s', dist:1.8, expo:1.2, dec:6.0 },
 
-{ ph:'III · breaking free', title:'Below the threshold: <em>it stays</em>',
-  body:`Here is light pitched just below that threshold, at an easy brightness. The cloud shivers, but the electron holds on. A single photon simply hasn't enough energy to free it — and however carefully you aim, light arrives one photon at a time.`,
+{ ph:'III · the photoelectric effect', title:'Energy <em>below</em> the work function',
+  body:`Here is a photon with energy slightly lower than the work function, at a low intensity. One photon interacts with one electron, and the photon energy is less than the work function, so no electron is emitted.`,
   cfg:PHOTO, inState:'1s', dist:2.0, expo:1.2, dec:6.0, ejReadout:true,
   trigger:{ run:{ field:{type:'photo',w:0.40,E0:0.045,Tp:170}, steps:3400, secs:5.0 } } },
 
-{ ph:'III · breaking free', title:'Brighter <em>barely helps</em>',
-  body:`The same below-threshold colour, now far more intense. A faint trickle does escape — but only because, packed this densely, an electron occasionally absorbs two photons at once, and two below-threshold photons together just clear the bar. It's a rare double-hit, not the clean release a single good photon gives. The lesson holds: brightness is a feeble lever, colour is the switch.`,
-  cfg:PHOTO, inState:'1s', dist:2.0, expo:1.2, dec:6.0, ejReadout:true,
-  trigger:{ run:{ field:{type:'photo',w:0.40,E0:0.09,Tp:170}, steps:3400, secs:5.0 } } },
-
-{ ph:'III · breaking free', title:'Above the threshold: <em>it leaves</em>',
-  body:`Nudge the colour just past the threshold and the electron breaks free at once, even at a whisper of brightness. It departs in two clean lobes along the axis it was pushed — the simplest shape a freed electron can take. Whatever energy the photon carried beyond the threshold becomes the electron's speed: go bluer and it leaves faster still. The colour decides; the brightness never did.`,
+{ ph:'III · the photoelectric effect', title:'Energy <em>above</em> the work function',
+  body:`Now a photon with energy above the work function. The electron is emitted at once, even at the lowest intensity, in two lobes along the direction the light pushed it. The energy the photon carries beyond the work function becomes the electron's kinetic energy: KE_max = hf − φ. Raise the frequency further and it is emitted faster; the readout tracks its energy.`,
   cfg:PHOTO, inState:'1s', dist:2.2, expo:1.15, dec:6.0, ejReadout:true, keReadout:0.60,
   trigger:{ run:{ field:{type:'photo',w:0.60,E0:0.07,Tp:150}, steps:3600, secs:5.5 } } },
 
-// ===================== PHASE III — the violent regime =====================
-{ ph:'III · the violent regime', title:'Push <em>hard</em>',
-  body:`Now an absurdly intense pulse of infrared, well below the threshold frequency. This is the strong-field regime, where the photoelectric effect breaks down. The field tears a sliver of the electron loose, hurls it outward, then reverses and drives it straight back through the core — and those ripples are that returning piece crashing through itself, like two wakes crossing on water.`,
+{ ph:'III · the photoelectric effect', title:`Intensity <em>doesn't matter</em>*`,
+  body:`In the photoelectric effect, intensity does not decide whether electrons are emitted — only frequency does. If light were a wave, raising the intensity would pour in more energy, the electron's energy would build up, and it would eventually be emitted, with a kinetic energy set by the intensity, not the frequency. That is not what happens: below the work function no electron is emitted however intense the light, and above it electrons are emitted even at the lowest intensity. Light must therefore arrive as photons of energy E = hf, one photon interacting with one electron. Here the photon energy is below the work function, but the intensity is very high — an enormous number of photons arriving each second, enough to make the whole cloud heave. Nothing should happen according to Edexcel, yet a faint trickle of electrons escapes. When the intensity is this high, an electron occasionally absorbs two or more photons at almost the same instant; their energies add together, and the total can exceed the work function. This is called multiphoton absorption, and it is beyond your course: in the exam, one photon interacts with one electron, and below the threshold frequency no electron is emitted however intense the light.`,
+  cfg:PHOTO, inState:'1s', dist:2.0, expo:1.2, dec:6.0, ejReadout:true,
+  trigger:{ run:{ field:{type:'photo',w:0.40,E0:0.09,Tp:170}, steps:3400, secs:5.0 } } },
+
+// ===================== PHASE III — beyond the course =====================
+{ ph:'III · beyond the course', title:'What if we tried <em>more power?</em>',
+  body:`This is far beyond your course — frontier physics, shown so you can see where the rule you have just learned stops. The light is an extremely intense pulse of infrared, with photons far below the work function; it is how the briefest flashes of light ever made are produced. By everything in the last few screens, nothing should happen. Instead, the field is so strong that it no longer frees the electron one photon at a time. This does not break the rule: it is not the photoelectric effect, where one photon frees one electron, but an intense field distorting the whole atom — a completely different mechanism.`,
   cfg:ION, inState:'1s', dist:2.4, expo:1.15, dec:5.75, clock:true, scope:true,
   trigger:{ run:{ field:{type:'strong',ncyc:2,I:2e14}, steps:4684, secs:8.0 },
-            holds:[ {atFrac:0.30, point:{axisAt:-22,txt:'a sliver tunnels out',cls:''}},
-                    {atFrac:0.52, point:{axisAt:-40,txt:'driven back through the core',cls:'teal'}} ] } },
+            holds:[ {atFrac:0.30, point:{axisAt:-22,txt:'a sliver of the electron is pulled away',cls:''}},
+                    {atFrac:0.52, point:{axisAt:-40,txt:'driven back through the centre, interfering with itself',cls:'teal'}} ] } },
 
 // ===================== PHASE IV — explore + the build =====================
 { ph:'IV · explore', title:'<em>Your turn</em>',
-  body:`Two dials: how hard you push, and the colour you push with. The Keldysh number tells you which world you're in — above one, the electron is chipped off a photon at a time; below one, the field is strong enough to rip it out bodily and the recollisions begin. One equation throughout; only the dials move.`,
-  cfg:ION, inState:'1s', dist:2.2, expo:1.2, dec:5.75, clock:true, scope:true, sandbox:true },
+  body:`Try playing around with the simulation. The work function is about 13.6 eV. Can you prove it?`,
+  cfg:PHOTO, inState:'1s', dist:2.2, expo:1.2, dec:6.0, scope:true, sandbox:true },
 
 { ph:'the build', title:'How this was <em>made</em>', doc:true },
 ];
@@ -812,23 +816,22 @@ function sbW(){ return 45.5634/(+$('#sb-w').value); }   // a.u. angular freq fro
 function refreshSB(){
   const I=sbI(); $('#sb-i-v').textContent=I.toExponential(1);
   $('#sb-w-v').textContent=(+$('#sb-w').value)+' nm';
-  const w=sbW(); const E0=Math.sqrt(I/3.51e16), Up=E0*E0/(4*w*w), g=Math.sqrt((SIM.Ip/27.2114)/(2*Up));
-  $('#sb-g-v').textContent=g.toFixed(2); $('#sb-g-v').style.color=g<1?'#22b5b9':'#e64097';
 }
 function bindSandbox(){
   $('#sb-i').addEventListener('input',refreshSB);
   $('#sb-w').addEventListener('input',refreshSB);
   $('#sb-run').onclick=()=>{ animating=true; runState='running'; scopeClear(); needsDraw=true;
-    const w=sbW(), steps=Math.round(1.7*2*2*Math.PI/w/ION.dt);
-    worker.postMessage({type:'run',cfg:ION,dt:ION.dt,start:'1s',
-      field:{type:'strong',ncyc:2,I:sbI(),w}, steps, secs:7}); };
+    const w=sbW(), E0=Math.sqrt(sbI()/3.51e16), Tp=12*2*Math.PI/w, steps=Math.round((Tp+200)/PHOTO.dt);
+    worker.postMessage({type:'run',cfg:PHOTO,dt:PHOTO.dt,start:'1s',
+      field:{type:'photo',w,E0,Tp}, steps, secs:7}); };
 }
 
 // ===== readout =====
 function paintReadout(){
   const f=latestFrame, B=$beat(); if(!B) return;
   let cap='binding energy', big=SIM.Ip.toFixed(2)+' eV';
-  if(B.keReadout){ cap='photoelectron KE'; const ke=(B.keReadout*27.2114 - SIM.Ip);
+  if(B.sandbox){ cap='photon energy'; big=(1239.841984/(+$('#sb-w').value)).toFixed(1)+' eV'; }
+  else if(B.keReadout){ cap='photoelectron KE'; const ke=(B.keReadout*27.2114 - SIM.Ip);
       big=ke.toFixed(1)+' eV'; }
   else if(B.ejReadout){ cap='ejected'; big=f?(Math.max(0,f.obs.ejected)*100).toFixed(1)+'%':'0.0%'; }
   else if(B.emitOnRun){ cap='photon emitted'; big=(SIM.gap?SIM.gap.toFixed(1):'10.0')+' eV'; }
